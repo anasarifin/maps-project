@@ -15,6 +15,20 @@
 	height: 20px;
 }
 
+#map-popup {
+	width: max-content;
+	height: max-content;
+}
+#map-popup span {
+	text-align: center;
+	display: block;
+}
+#map-popup .edit {
+	margin-top: 5px;
+	color: blue;
+	cursor: pointer;
+}
+
 #map-form {
 	display: grid;
 	grid-template-columns: 1fr;

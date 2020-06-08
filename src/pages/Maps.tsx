@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useRef, useEffect } from "react";
-// import Geocode from "react-geocode
+import Axios from "axios";
+import AxiosCancelRequest from "axios-cancel-request";
 import "../styles/Map.css";
+const AxiosCancelable = AxiosCancelRequest(Axios);
 
 const MapComponent = () => {
 	const mapRef = useRef();
@@ -10,32 +12,15 @@ const MapComponent = () => {
 		lat: -6.2088,
 		lng: 106.8456,
 	});
-
-	// --- Convert latlng to location name ---
-
-	// Geocode.setApiKey(process.env.GOOGLE_API);
-	// Geocode.setLanguage("en");
-	// Geocode.setRegion("id");
-
-	// const setGeo = (latlng) => {
-	// 	Geocode.fromLatLng(latlng.lat, latlng.lng).then(
-	// 		(response) => {
-	// 			setName(response.results[0].formatted_address);
-	// 		},
-	// 		(error) => {
-	// 			console.error(error);
-	// 		},
-	// 	);
-	// };
-
-	// useEffect(() => {
-	// 	setGeo(center);
-	// }, []);
-
-	// ---------------------------------------
+	const [data, setData] = useState({});
 
 	// Cannot use React Element to create custom popup, must using string
 	const contentString = `
+	<div id="map-popup">
+	</div>
+	`;
+
+	const contentStringInput = `
 	<form id="map-form">
 	<label>Provinsi :</label>
 	<input class="map-form-input" />
@@ -92,6 +77,29 @@ const MapComponent = () => {
 		});
 	}, []);
 
+	const getLocation = (lat: number, lng: number) => {
+		AxiosCancelable({ url: `https://siis-api.udata.id/dm_get_dagri/${lat}/${lng}` })
+			.then((resolve) => {
+				const parentElement = document.getElementById("map-popup");
+				const { provinsi, kabupaten_kota, kecamatan, desa_kelurahan } = resolve.data[0];
+				const child = `
+				<div>
+				<span>${provinsi}</span>
+				<span>${kabupaten_kota}</span>
+				<span>${kecamatan}</span>
+				<span>${desa_kelurahan}</span>
+				<span class="edit">Edit Data</span>
+				</div>`;
+
+				parentElement.insertAdjacentHTML("beforeend", child);
+			})
+			.catch((reject) => {
+				if (!Axios.isCancel(reject)) {
+					console.log(reject);
+				}
+			});
+	};
+
 	const createGoogleMap = (): any => {
 		return new window.google.maps.Map(mapRef.current, {
 			zoom: 16,
@@ -117,7 +125,7 @@ const MapComponent = () => {
 	// Apply onSubmitHandler event when dom is ready
 	const watchSubmit = (infoWindow: any): void => {
 		window.google.maps.event.addListener(infoWindow, "domready", (): void => {
-			document.getElementById("map-form").addEventListener("submit", onSubmitHandler);
+			// document.getElementById("map-form").addEventListener("submit", onSubmitHandler);
 		});
 	};
 
@@ -138,7 +146,9 @@ const MapComponent = () => {
 		googleMap.addListener("click", (e: any): any => {
 			infoWindow.close();
 			infoWindow = new window.google.maps.InfoWindow({ position: e.latLng });
+			googleMap.panTo(e.latLng);
 			infoWindow.setContent(contentString);
+			getLocation(e.latLng.lat(), e.latLng.lng());
 			infoWindow.open(googleMap);
 			watchSubmit(infoWindow);
 

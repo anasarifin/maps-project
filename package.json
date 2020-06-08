@@ -6,6 +6,7 @@
   "homepage": ".",
   "dependencies": {
     "axios": "^0.19.2",
+    "axios-cancel-request": "^1.0.3",
     "error-overlay-webpack-plugin": "^0.4.1",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
