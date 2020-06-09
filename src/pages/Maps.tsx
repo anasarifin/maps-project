@@ -91,7 +91,14 @@ const MapComponent = () => {
 	const createAutoComplete = (): any => {
 		// Cannot use useRef() to get element
 		const inputElement = document.getElementsByClassName("map-search-bar")[0];
-		return new window.google.maps.places.Autocomplete(inputElement);
+		const inputReturn = new window.google.maps.places.Autocomplete(inputElement);
+
+		inputReturn.bindTo("bounds", googleMap);
+		inputReturn.setTypes(["geocode"]);
+		inputReturn.setComponentRestrictions({ country: ["id"] });
+		inputReturn.setFields(["address_components", "geometry", "icon", "name"]);
+
+		return inputReturn;
 	};
 
 	const mapEventListener = (): void => {
@@ -101,37 +108,34 @@ const MapComponent = () => {
 		});
 		infoWindow.open(googleMap);
 
-		autoComplete.bindTo("bounds", googleMap);
-		autoComplete.setTypes(["geocode"]);
-		autoComplete.setComponentRestrictions({ country: ["id"] });
-		autoComplete.setFields(["address_components", "geometry", "icon", "name"]);
-
-		window.google.maps.event.addListener(autoComplete, "place_changed", function () {
-			infoWindow.close();
-			marker.setVisible(false);
-			var place = autoComplete.getPlace();
+		// SearchBox event listener
+		window.google.maps.event.addListener(autoComplete, "place_changed", () => {
+			const place = autoComplete.getPlace();
 			console.log(place);
 			if (!place.geometry) {
-				alert("No details available for input: '" + place.name + "'");
+				alert("Quota exceeded!");
 				return;
 			}
 
-			if (place.geometry.viewport) {
+			const { location, viewport } = place.geometry;
+			if (viewport) {
 				googleMap.fitBounds(place.geometry.viewport);
 			} else {
 				googleMap.setCenter(place.geometry.location);
-				googleMap.setZoom(17);
 			}
 
-			const { location } = place.geometry;
+			marker.setVisible(false);
+			infoWindow.close();
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			getLocation(location.lat(), location.lng());
 			infoWindow.open(googleMap);
 
-			marker.setPosition(place.geometry.location);
+			infoWindow.setPosition(location);
+			marker.setPosition(location);
 			marker.setVisible(true);
 		});
 
+		// Maps on click event listener
 		googleMap.addListener("click", (e: any): any => {
 			infoWindow.close();
 			infoWindow = new window.google.maps.InfoWindow({ position: e.latLng });

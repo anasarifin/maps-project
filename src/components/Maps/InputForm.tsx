@@ -58,9 +58,9 @@ interface Data {
 	jalan?: string;
 }
 interface Props {
+	data: Data;
 	show: boolean;
 	hide: () => void;
-	data: Data;
 }
 
 export default InputForm;
