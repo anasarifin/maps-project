@@ -11,7 +11,7 @@
 	top: 10px;
 	left: 10px;
 	max-width: 300px;
-	width: 90%;
+	width: 70%;
 	height: 20px;
 }
 
@@ -23,7 +23,7 @@
 	text-align: center;
 	display: block;
 }
-#map-popup .edit {
+#map-popup-edit {
 	margin-top: 5px;
 	color: blue;
 	cursor: pointer;
@@ -38,6 +38,46 @@
 	margin: 5px;
 }
 #map-form button {
+	margin-top: 15px;
+}
+
+.map-input-bg {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 0;
+	height: 0;
+	background-color: rgba(0, 0, 0, 0.5);
+}
+.map-input-bg.show {
+	width: 100%;
+	height: 100%;
+}
+#map-input-form {
+	position: fixed;
+	display: none;
+	grid-template-columns: 1fr;
+	background-color: white;
+	border-radius: 5px;
+	padding: 15px;
+	top: 60%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	opacity: 0;
+	transition: 0.3s;
+}
+#map-input-form.show {
+	top: 50%;
+	opacity: 1;
+}
+#map-input-form input {
+	text-transform: uppercase;
+}
+#map-input-form label {
+	display: block;
+	margin: 7px;
+}
+#map-input-form button {
 	margin-top: 15px;
 }
 

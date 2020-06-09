@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
 import "../styles/Map.css";
+import InputForm from "../components/Maps/InputForm";
 const AxiosCancelable = AxiosCancelRequest(Axios);
 
 const MapComponent = () => {
@@ -13,51 +14,7 @@ const MapComponent = () => {
 		lng: 106.8456,
 	});
 	const [data, setData] = useState({});
-
-	// Cannot use React Element to create custom popup, must using string
-	const contentString = `
-	<div id="map-popup">
-	</div>
-	`;
-
-	const contentStringInput = `
-	<form id="map-form">
-	<label>Provinsi :</label>
-	<input class="map-form-input" />
-	<label>Kabupaten :</label>
-	<input class="map-form-input" />
-	<label>Kelurahan :</label>
-	<input class="map-form-input" />
-	<label>Kecamatan :</label>
-	<input class="map-form-input" />
-	<label>Jalan :</label>
-	<input class="map-form-input" />
-	<button type="submit">Submit</button>
-    </form>`;
-
-	// Get value using traditional dom, because can't use React Element
-	const onSubmitHandler = (e: Event): void => {
-		e.preventDefault();
-
-		const inputValue = document.getElementsByClassName("map-form-input") as HTMLCollectionOf<HTMLInputElement>;
-		const [provinsi, kabupaten, kelurahan, kecamatan, jalan] = inputValue;
-
-		if (!provinsi.value) return alert("Nama provinsi belum diisi!");
-		if (!kabupaten.value) return alert("Nama kabupaten belum diisi!");
-		if (!kelurahan.value) return alert("Nama kelurahan belum diisi!");
-		if (!kecamatan.value) return alert("Nama kecamatan belum diisi!");
-		if (!jalan.value) return alert("Nama jalan belum diisi!");
-
-		console.log({
-			provinsi: provinsi.value,
-			kabupaten: kabupaten.value,
-			kelurahan: kelurahan.value,
-			kecamatan: kecamatan.value,
-			jalan: jalan.value,
-		});
-
-		alert("See console...");
-	};
+	const [formShow, setFormShow] = useState(false);
 
 	// Initialize an variables to call it later
 	let googleMap;
@@ -72,7 +29,6 @@ const MapComponent = () => {
 		googleScript.addEventListener("load", () => {
 			googleMap = createGoogleMap();
 			marker = createMarker();
-			// searchBox = createSearchBox();
 			mapEventListener();
 		});
 	}, []);
@@ -80,6 +36,9 @@ const MapComponent = () => {
 	const getLocation = (lat: number, lng: number) => {
 		AxiosCancelable({ url: `https://siis-api.udata.id/dm_get_dagri/${lat}/${lng}` })
 			.then((resolve) => {
+				setData(resolve.data[0]);
+
+				// Cannot use React Element to create custom popup, must using string
 				const parentElement = document.getElementById("map-popup");
 				const { provinsi, kabupaten_kota, kecamatan, desa_kelurahan } = resolve.data[0];
 				const child = `
@@ -88,10 +47,17 @@ const MapComponent = () => {
 				<span>${kabupaten_kota}</span>
 				<span>${kecamatan}</span>
 				<span>${desa_kelurahan}</span>
-				<span class="edit">Edit Data</span>
+				<span id="map-popup-edit">Edit Data</span>
 				</div>`;
 
+				parentElement.innerHTML = "";
 				parentElement.insertAdjacentHTML("beforeend", child);
+				document.getElementById("map-popup-edit").addEventListener("click", () => {
+					document.getElementById("map-input-form").style.display = "grid";
+					setTimeout(() => {
+						setFormShow(true);
+					}, 10);
+				});
 			})
 			.catch((reject) => {
 				if (!Axios.isCancel(reject)) {
@@ -100,6 +66,10 @@ const MapComponent = () => {
 			});
 	};
 
+	useEffect(() => {
+		getLocation(center.lat, center.lng);
+	}, []);
+
 	const createGoogleMap = (): any => {
 		return new window.google.maps.Map(mapRef.current, {
 			zoom: 16,
@@ -107,13 +77,6 @@ const MapComponent = () => {
 			clickableIcons: false,
 		});
 	};
-
-	// const createSearchBox = (): any => {
-	// 	const searchRef = document.getElementById("searchRef");
-	// 	const searchElement = new window.google.maps.places.SearchBox(searchRef);
-	// 	googleMap.controls[window.google.maps.ControlPosition.TOP_LEFT].push(searchRef);
-	// 	return searchElement;
-	// };
 
 	const createMarker = (): any => {
 		return new window.google.maps.Marker({
@@ -131,23 +94,17 @@ const MapComponent = () => {
 
 	const mapEventListener = (): void => {
 		let infoWindow = new window.google.maps.InfoWindow({
-			content: contentString,
+			content: `<div id="map-popup">Fetching data...</div>`,
 			position: center,
 		});
 		infoWindow.open(googleMap);
 		watchSubmit(infoWindow);
 
-		// googleMap.addListener("bounds_changed", function () {
-		// 	searchBox.setBounds(googleMap.getBounds());
-		// 	console.log(googleMap.getBounds());
-		// 	console.log(searchBox);
-		// });
-
 		googleMap.addListener("click", (e: any): any => {
 			infoWindow.close();
 			infoWindow = new window.google.maps.InfoWindow({ position: e.latLng });
 			googleMap.panTo(e.latLng);
-			infoWindow.setContent(contentString);
+			infoWindow.setContent(`<div id="map-popup"/>Fetching data...</>`);
 			getLocation(e.latLng.lat(), e.latLng.lng());
 			infoWindow.open(googleMap);
 			watchSubmit(infoWindow);
@@ -163,7 +120,9 @@ const MapComponent = () => {
 	return (
 		<div className="map-page">
 			<div className="map-container" ref={mapRef} />
-			<input className="map-search-bar" placeholder="Search here..." />
+			<input className="map-search-bar" placeholder="Search here... (not working yet)" />
+			<div className={"map-input-bg" + (formShow ? " show" : "")} />
+			<InputForm show={formShow} hide={() => setFormShow(false)} data={data} />
 		</div>
 	);
 };
