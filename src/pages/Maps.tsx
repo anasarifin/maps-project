@@ -8,7 +8,7 @@ const AxiosCancelable = AxiosCancelRequest(Axios);
 
 const MapComponent = () => {
 	const mapRef = useRef();
-	// const searchRef = useRef();
+	const inputRef = useRef();
 	const [center, setCenter] = useState({
 		lat: -6.2088,
 		lng: 106.8456,
@@ -19,16 +19,18 @@ const MapComponent = () => {
 	// Initialize an variables to call it later
 	let googleMap;
 	let marker;
+	let autoComplete;
 
 	useEffect(() => {
 		// Create script element and call google maps api
 		const googleScript = document.createElement("script");
-		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places`;
+		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places,geometry`;
 		window.document.body.appendChild(googleScript);
 
-		googleScript.addEventListener("load", () => {
-			googleMap = createGoogleMap();
-			marker = createMarker();
+		googleScript.addEventListener("load", async () => {
+			googleMap = await createGoogleMap();
+			marker = await createMarker();
+			autoComplete = await createAutoComplete();
 			mapEventListener();
 		});
 	}, []);
@@ -75,6 +77,7 @@ const MapComponent = () => {
 			zoom: 16,
 			center: center,
 			clickableIcons: false,
+			fullscreenControl: false,
 		});
 	};
 
@@ -85,11 +88,10 @@ const MapComponent = () => {
 		});
 	};
 
-	// Apply onSubmitHandler event when dom is ready
-	const watchSubmit = (infoWindow: any): void => {
-		window.google.maps.event.addListener(infoWindow, "domready", (): void => {
-			// document.getElementById("map-form").addEventListener("submit", onSubmitHandler);
-		});
+	const createAutoComplete = (): any => {
+		// Cannot use useRef() to get element
+		const inputElement = document.getElementsByClassName("map-search-bar")[0];
+		return new window.google.maps.places.Autocomplete(inputElement);
 	};
 
 	const mapEventListener = (): void => {
@@ -98,16 +100,45 @@ const MapComponent = () => {
 			position: center,
 		});
 		infoWindow.open(googleMap);
-		watchSubmit(infoWindow);
+
+		autoComplete.bindTo("bounds", googleMap);
+		autoComplete.setTypes(["geocode"]);
+		autoComplete.setComponentRestrictions({ country: ["id"] });
+		autoComplete.setFields(["address_components", "geometry", "icon", "name"]);
+
+		window.google.maps.event.addListener(autoComplete, "place_changed", function () {
+			infoWindow.close();
+			marker.setVisible(false);
+			var place = autoComplete.getPlace();
+			console.log(place);
+			if (!place.geometry) {
+				alert("No details available for input: '" + place.name + "'");
+				return;
+			}
+
+			if (place.geometry.viewport) {
+				googleMap.fitBounds(place.geometry.viewport);
+			} else {
+				googleMap.setCenter(place.geometry.location);
+				googleMap.setZoom(17);
+			}
+
+			const { location } = place.geometry;
+			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+			getLocation(location.lat(), location.lng());
+			infoWindow.open(googleMap);
+
+			marker.setPosition(place.geometry.location);
+			marker.setVisible(true);
+		});
 
 		googleMap.addListener("click", (e: any): any => {
 			infoWindow.close();
 			infoWindow = new window.google.maps.InfoWindow({ position: e.latLng });
 			googleMap.panTo(e.latLng);
-			infoWindow.setContent(`<div id="map-popup"/>Fetching data...</>`);
+			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			getLocation(e.latLng.lat(), e.latLng.lng());
 			infoWindow.open(googleMap);
-			watchSubmit(infoWindow);
 
 			marker.setMap(null);
 			return (marker = new window.google.maps.Marker({
@@ -120,7 +151,7 @@ const MapComponent = () => {
 	return (
 		<div className="map-page">
 			<div className="map-container" ref={mapRef} />
-			<input className="map-search-bar" placeholder="Search here... (not working yet)" />
+			<input className="map-search-bar" ref={inputRef} placeholder="Search here... (not working yet)" />
 			<div className={"map-input-bg" + (formShow ? " show" : "")} />
 			<InputForm show={formShow} hide={() => setFormShow(false)} data={data} />
 		</div>
