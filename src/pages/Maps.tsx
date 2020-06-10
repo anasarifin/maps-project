@@ -45,11 +45,11 @@ const MapComponent = () => {
 				const { provinsi, kabupaten_kota, kecamatan, desa_kelurahan } = resolve.data[0];
 				const child = `
 				<div>
-				<span>${provinsi}</span>
-				<span>${kabupaten_kota}</span>
-				<span>${kecamatan}</span>
-				<span>${desa_kelurahan}</span>
-				<span id="map-popup-edit">Edit Data</span>
+					<span>${provinsi}</span>
+					<span>${kabupaten_kota}</span>
+					<span>${kecamatan}</span>
+					<span>${desa_kelurahan}</span>
+					<span id="map-popup-edit">Edit Data</span>
 				</div>`;
 
 				parentElement.innerHTML = "";
@@ -64,6 +64,20 @@ const MapComponent = () => {
 			.catch((reject) => {
 				if (!Axios.isCancel(reject)) {
 					console.log(reject);
+					const parentElement = document.getElementById("map-popup");
+					const child = `
+					<div>
+						<span>Fetching failed!</span>
+						<span id="map-popup-edit>Refresh</span>
+					</div>
+					`;
+
+					parentElement.innerHTML = "";
+					parentElement.insertAdjacentHTML("beforeend", child);
+					document.getElementById("map-popup-edit").addEventListener("click", () => {
+						const position = marker.getPosition();
+						getLocation(position.lat(), position.lng());
+					});
 				}
 			});
 	};
@@ -90,13 +104,13 @@ const MapComponent = () => {
 
 	const createAutoComplete = (): any => {
 		// Cannot use useRef() to get element
-		const inputElement = document.getElementsByClassName("map-search-bar")[0];
+		const inputElement = document.getElementById("map-search-bar");
 		const inputReturn = new window.google.maps.places.Autocomplete(inputElement);
 
 		inputReturn.bindTo("bounds", googleMap);
 		inputReturn.setTypes(["geocode"]);
 		inputReturn.setComponentRestrictions({ country: ["id"] });
-		inputReturn.setFields(["address_components", "geometry", "icon", "name"]);
+		inputReturn.setFields(["geometry", "name"]);
 
 		return inputReturn;
 	};
@@ -122,6 +136,7 @@ const MapComponent = () => {
 				googleMap.fitBounds(place.geometry.viewport);
 			} else {
 				googleMap.setCenter(place.geometry.location);
+				googleMap.setZoom(16);
 			}
 
 			marker.setVisible(false);
@@ -155,7 +170,7 @@ const MapComponent = () => {
 	return (
 		<div className="map-page">
 			<div className="map-container" ref={mapRef} />
-			<input className="map-search-bar" ref={inputRef} placeholder="Search here... (not working yet)" />
+			<input id="map-search-bar" ref={inputRef} placeholder="Search here... (not working yet)" />
 			<div className={"map-input-bg" + (formShow ? " show" : "")} />
 			<InputForm show={formShow} hide={() => setFormShow(false)} data={data} />
 		</div>
