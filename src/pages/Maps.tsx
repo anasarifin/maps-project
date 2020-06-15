@@ -9,16 +9,21 @@ const AxiosCancelable = AxiosCancelRequest(Axios);
 const MapComponent = () => {
 	const mapRef = useRef();
 	const inputRef = useRef();
+	const inputLatLng = useRef();
 	const [center, setCenter] = useState({
 		lat: -6.2088,
 		lng: 106.8456,
 	});
 	const [data, setData] = useState({});
+	const [inputLat, setInputLat] = useState("");
+	const [inputLng, setInputLng] = useState("");
 	const [formShow, setFormShow] = useState(false);
+	const [searchName, setSearchName] = useState(true);
 
 	// Initialize an variables to call it later
 	let googleMap;
 	let marker;
+	let infoWindow;
 	let autoComplete;
 
 	useEffect(() => {
@@ -30,6 +35,7 @@ const MapComponent = () => {
 		googleScript.addEventListener("load", async () => {
 			googleMap = await createGoogleMap();
 			marker = await createMarker();
+			infoWindow = await createInfoWindow();
 			autoComplete = await createAutoComplete();
 			mapEventListener();
 		});
@@ -60,21 +66,29 @@ const MapComponent = () => {
 						setFormShow(true);
 					}, 10);
 				});
+
+				// new window.google.maps.KmlLayer({
+				// 	url: "https://www.iuwashplus.or.id/work/filekml/3_dkijakarta2.kml",
+				// 	map: googleMap,
+				// 	clickable: false,
+				// });
 			})
 			.catch((reject) => {
 				if (!Axios.isCancel(reject)) {
 					console.log(reject);
 					const parentElement = document.getElementById("map-popup");
+					console.log(parentElement);
 					const child = `
 					<div>
-						<span>Fetching failed!</span>
-						<span id="map-popup-edit>Refresh</span>
+						<div>Fetching failed !</div>
+						<span id="map-popup-edit">Try again...</span>
 					</div>
 					`;
 
 					parentElement.innerHTML = "";
 					parentElement.insertAdjacentHTML("beforeend", child);
 					document.getElementById("map-popup-edit").addEventListener("click", () => {
+						infoWindow.setContent(`<div id="map-popup">Fetching again...</div>`);
 						const position = marker.getPosition();
 						getLocation(position.lat(), position.lng());
 					});
@@ -82,16 +96,16 @@ const MapComponent = () => {
 			});
 	};
 
-	useEffect(() => {
-		getLocation(center.lat, center.lng);
-	}, []);
-
 	const createGoogleMap = (): any => {
 		return new window.google.maps.Map(mapRef.current, {
 			zoom: 16,
 			center: center,
 			clickableIcons: false,
 			fullscreenControl: false,
+			mapTypeControl: true,
+			mapTypeControlOptions: {
+				position: window.google.maps.ControlPosition.BOTTOM_CENTER,
+			},
 		});
 	};
 
@@ -102,9 +116,20 @@ const MapComponent = () => {
 		});
 	};
 
+	const createInfoWindow = (): any => {
+		const returnInfoWindow = new window.google.maps.InfoWindow({
+			content: `<div id="map-popup">Fetching data...</div>`,
+			position: center,
+		});
+		returnInfoWindow.open(googleMap);
+		getLocation(center.lat, center.lng);
+
+		return returnInfoWindow;
+	};
+
 	const createAutoComplete = (): any => {
 		// Cannot use useRef() to get element
-		const inputElement = document.getElementById("map-search-bar");
+		const inputElement = document.getElementById("map-search-name");
 		const inputReturn = new window.google.maps.places.Autocomplete(inputElement);
 
 		inputReturn.bindTo("bounds", googleMap);
@@ -116,12 +141,6 @@ const MapComponent = () => {
 	};
 
 	const mapEventListener = (): void => {
-		let infoWindow = new window.google.maps.InfoWindow({
-			content: `<div id="map-popup">Fetching data...</div>`,
-			position: center,
-		});
-		infoWindow.open(googleMap);
-
 		// SearchBox event listener
 		window.google.maps.event.addListener(autoComplete, "place_changed", () => {
 			const place = autoComplete.getPlace();
@@ -139,38 +158,118 @@ const MapComponent = () => {
 				googleMap.setZoom(16);
 			}
 
-			marker.setVisible(false);
 			infoWindow.close();
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			getLocation(location.lat(), location.lng());
 			infoWindow.open(googleMap);
-
 			infoWindow.setPosition(location);
+
+			marker.setVisible(false);
 			marker.setPosition(location);
 			marker.setVisible(true);
+
+			getLocation(location.lat(), location.lng());
+		});
+
+		marker.addListener("click", function () {
+			console.log(infoWindow);
+			if (!infoWindow.getMap()) {
+				const location = marker.getPosition();
+
+				infoWindow.close();
+				infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+				infoWindow.open(googleMap);
+				infoWindow.setPosition(location);
+
+				getLocation(location.lat(), location.lng());
+			}
 		});
 
 		// Maps on click event listener
-		googleMap.addListener("click", (e: any): any => {
+		googleMap.addListener("click", (e: any): void => {
+			if (inputRef.current) inputRef.current.value = "";
+
 			infoWindow.close();
-			infoWindow = new window.google.maps.InfoWindow({ position: e.latLng });
 			googleMap.panTo(e.latLng);
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			getLocation(e.latLng.lat(), e.latLng.lng());
 			infoWindow.open(googleMap);
+			infoWindow.setPosition(e.latLng);
+			getLocation(e.latLng.lat(), e.latLng.lng());
 
-			marker.setMap(null);
-			return (marker = new window.google.maps.Marker({
-				position: { lat: e.latLng.lat(), lng: e.latLng.lng() },
-				map: googleMap,
-			}));
+			marker.setVisible(false);
+			marker.setPosition(e.latLng);
+			marker.setVisible(true);
 		});
+
+		inputLatLng.current.addEventListener("submit", (e) => {
+			e.preventDefault();
+
+			// Cannot use React state, must using traditional way to get value
+			const element = inputLatLng.current.querySelectorAll("input");
+			const location = {
+				lat: parseFloat(element[0].value) || 0,
+				lng: parseFloat(element[1].value) || 0,
+			};
+
+			console.log(location);
+			infoWindow.close();
+			googleMap.panTo(location);
+			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+			infoWindow.open(googleMap);
+			infoWindow.setPosition(location);
+			getLocation(location.lat, location.lng);
+
+			marker.setVisible(false);
+			marker.setPosition(location);
+			marker.setVisible(true);
+		});
+	};
+
+	const onChangeLat = (value?: string): void => {
+		const regex = /^[0-9.-]*$/;
+		if (regex.test(value)) {
+			setInputLat(value);
+		}
+	};
+	const onChangeLng = (value?: string): void => {
+		const regex = /^[0-9.-]*$/;
+		if (regex.test(value)) {
+			setInputLng(value);
+		}
+	};
+	const onSubmitSearch = async (e) => {
+		e.preventDefault();
+
+		// infoWindow.close();
+		// googleMap.panTo(e.latLng);
+		// infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+		// infoWindow.open(googleMap);
+		// infoWindow.setPosition(e.latLng);
+		// getLocation(location.lat, location.lng);
+
+		// marker.setVisible(false);
+		// marker.setPosition(e.latLng);
+		// marker.setVisible(true);
 	};
 
 	return (
 		<div className="map-page">
 			<div className="map-container" ref={mapRef} />
-			<input id="map-search-bar" ref={inputRef} placeholder="Search here... (not working yet)" />
+			<div className="map-search-bar">
+				<span onClick={() => setSearchName(true)} className={searchName ? "active" : ""}>
+					Search by name
+				</span>
+				<span onClick={() => setSearchName(false)} className={searchName ? "" : "active"}>
+					Search by latlong
+				</span>
+				<br />
+				<input id="map-search-name" ref={inputRef} placeholder="Search here..." style={{ display: searchName ? "inline-block" : "none" }} />
+				<form ref={inputLatLng} style={{ display: !searchName ? "block" : "none" }}>
+					<input placeholder="Latitude" value={inputLat} onChange={(e) => onChangeLat(e.target.value)} />
+					<br />
+					<input placeholder="Longitude" value={inputLng} onChange={(e) => onChangeLng(e.target.value)} />
+					<button type="submit">Search</button>
+				</form>
+			</div>
 			<div className={"map-input-bg" + (formShow ? " show" : "")} />
 			<InputForm show={formShow} hide={() => setFormShow(false)} data={data} />
 		</div>

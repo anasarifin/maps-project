@@ -23,7 +23,7 @@ const InputForm = ({ data, show, hide }: Props) => {
 		closeHandler();
 	};
 
-	const closeHandler = () => {
+	const closeHandler = (): void => {
 		hide();
 		setTimeout(() => {
 			formRef.current.style.display = "none";

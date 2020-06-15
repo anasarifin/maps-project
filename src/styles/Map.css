@@ -7,13 +7,31 @@
 	height: 100%;
 }
 
-#map-search-bar {
+.map-search-bar {
 	position: fixed;
 	top: 10px;
 	left: 10px;
-	max-width: 300px;
+	max-width: max-content;
 	width: 70%;
-	height: 20px;
+	height: max-content;
+	background: white;
+	border-radius: 3px;
+}
+.map-search-bar span {
+	display: inline-block;
+	padding: 10px 7px;
+	cursor: pointer;
+	background-color: whitesmoke;
+	color: gray;
+}
+.map-search-bar span.active {
+	background-color: white;
+	color: black;
+}
+
+#map-search-name {
+	width: 100%;
+	box-sizing: border-box;
 }
 
 #map-popup {
