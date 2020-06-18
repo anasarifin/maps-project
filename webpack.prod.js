@@ -2,7 +2,6 @@ const path = require("path");
 const webpack = require("webpack");
 const dotenv = require("dotenv");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-const ErrorOverlayPlugin = require("error-overlay-webpack-plugin");
 // const WorkboxPlugin = require("workbox-webpack-plugin");
 
 module.exports = () => {
@@ -55,7 +54,6 @@ module.exports = () => {
 				template: path.resolve(__dirname, "src", "index.html"),
 			}),
 			new webpack.DefinePlugin(envKeys),
-			new ErrorOverlayPlugin(),
 			// new WorkboxPlugin.GenerateSW({
 			// 	// these options encourage the ServiceWorkers to get in there fast
 			// 	// and not allow any straggling "old" SWs to hang around

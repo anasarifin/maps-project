@@ -15,6 +15,8 @@ const MapComponent = () => {
 		lng: 106.8456,
 	});
 	const [data, setData] = useState({});
+	const [kmlReady, setKmlReady] = useState(false);
+	const [polygon, setPolygon] = useState([]);
 	const [inputLat, setInputLat] = useState("");
 	const [inputLng, setInputLng] = useState("");
 	const [formShow, setFormShow] = useState(false);
@@ -24,12 +26,14 @@ const MapComponent = () => {
 	let googleMap;
 	let marker;
 	let infoWindow;
+	let kmlLayer;
 	let autoComplete;
+	let polygonVar;
 
 	useEffect(() => {
 		// Create script element and call google maps api
 		const googleScript = document.createElement("script");
-		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places,geometry`;
+		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_APIX}&libraries=places,geometry`;
 		window.document.body.appendChild(googleScript);
 
 		googleScript.addEventListener("load", async () => {
@@ -37,9 +41,31 @@ const MapComponent = () => {
 			marker = await createMarker();
 			infoWindow = await createInfoWindow();
 			autoComplete = await createAutoComplete();
+			kmlLayer = await createKmlLayer();
 			mapEventListener();
 		});
 	}, []);
+
+	const getPolygon = (lat: number, lng: number) => {
+		console.log(lng + "," + lat);
+		AxiosCancelable({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
+			.then((resolve) => {
+				const xxx = resolve.data.data[0].shape
+					.slice(11, -2)
+					.split(", ")
+					.map((x: string) => {
+						const split = x.split(" ");
+						return { lat: parseFloat(split[1]), lng: parseFloat(split[0]) };
+					});
+				polygonVar = xxx;
+			})
+			.catch((reject) => {
+				if (!Axios.isCancel(reject)) {
+					console.log(reject);
+					setPolygon("failed");
+				}
+			});
+	};
 
 	const getLocation = (lat: number, lng: number) => {
 		AxiosCancelable({ url: `https://siis-api.udata.id/dm_get_dagri/${lat}/${lng}` })
@@ -66,18 +92,11 @@ const MapComponent = () => {
 						setFormShow(true);
 					}, 10);
 				});
-
-				// new window.google.maps.KmlLayer({
-				// 	url: "https://www.iuwashplus.or.id/work/filekml/3_dkijakarta2.kml",
-				// 	map: googleMap,
-				// 	clickable: false,
-				// });
 			})
 			.catch((reject) => {
 				if (!Axios.isCancel(reject)) {
 					console.log(reject);
 					const parentElement = document.getElementById("map-popup");
-					console.log(parentElement);
 					const child = `
 					<div>
 						<div>Fetching failed !</div>
@@ -113,6 +132,7 @@ const MapComponent = () => {
 		return new window.google.maps.Marker({
 			position: center,
 			map: googleMap,
+			draggable: true,
 		});
 	};
 
@@ -122,9 +142,27 @@ const MapComponent = () => {
 			position: center,
 		});
 		returnInfoWindow.open(googleMap);
-		getLocation(center.lat, center.lng);
+		// getLocation(center.lat, center.lng);
+		getPolygon(center.lat, center.lng);
 
 		return returnInfoWindow;
+	};
+
+	const createKmlLayer = (): any => {
+		const plg = getPolygon(center.lat, center.lng);
+		console.log(plg);
+
+		const returnPolygon = new window.google.maps.Polygon({
+			paths: [],
+			strokeColor: "#FF0000",
+			strokeOpacity: 0.8,
+			strokeWeight: 2,
+			fillColor: "#FF0000",
+			fillOpacity: 0.25,
+			clickable: false,
+		});
+		returnPolygon.setMap(googleMap);
+		return returnPolygon;
 	};
 
 	const createAutoComplete = (): any => {
@@ -167,11 +205,11 @@ const MapComponent = () => {
 			marker.setPosition(location);
 			marker.setVisible(true);
 
-			getLocation(location.lat(), location.lng());
+			// getLocation(location.lat(), location.lng());
+			kmlLayer.setMap(null);
 		});
 
 		marker.addListener("click", function () {
-			console.log(infoWindow);
 			if (!infoWindow.getMap()) {
 				const location = marker.getPosition();
 
@@ -180,8 +218,25 @@ const MapComponent = () => {
 				infoWindow.open(googleMap);
 				infoWindow.setPosition(location);
 
-				getLocation(location.lat(), location.lng());
+				// getLocation(location.lat(), location.lng());
 			}
+			console.log(polygonVar);
+			kmlLayer.setMap(googleMap);
+		});
+
+		marker.addListener("dragstart", () => {
+			infoWindow.close();
+		});
+
+		marker.addListener("dragend", function () {
+			const location = marker.getPosition();
+
+			infoWindow.close();
+			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+			infoWindow.open(googleMap);
+			infoWindow.setPosition(location);
+
+			// getLocation(location.lat(), location.lng());
 		});
 
 		// Maps on click event listener
@@ -193,11 +248,22 @@ const MapComponent = () => {
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap);
 			infoWindow.setPosition(e.latLng);
-			getLocation(e.latLng.lat(), e.latLng.lng());
+			// getLocation(e.latLng.lat(), e.latLng.lng());
 
 			marker.setVisible(false);
 			marker.setPosition(e.latLng);
 			marker.setVisible(true);
+
+			kmlLayer.setMap(null);
+
+			// 	const elem = document.getElementsByClassName("map-search-bar");
+			// googleMap.control[window.google.maps.ControlPosition.TOP_CENTER].push(elem)
+
+			// kmlLayer = new window.google.maps.KmlLayer({
+			// 	url: "https://www.iuwashplus.or.id/work/filekml/3_dkijakarta2.kml",
+			// 	map: googleMap,
+			// 	clickable: false,
+			// });
 		});
 
 		inputLatLng.current.addEventListener("submit", (e) => {
@@ -216,7 +282,7 @@ const MapComponent = () => {
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap);
 			infoWindow.setPosition(location);
-			getLocation(location.lat, location.lng);
+			// getLocation(location.lat, location.lng);
 
 			marker.setVisible(false);
 			marker.setPosition(location);
@@ -254,7 +320,11 @@ const MapComponent = () => {
 	return (
 		<div className="map-page">
 			<div className="map-container" ref={mapRef} />
-			<div className="map-search-bar">
+			<div
+				className="map-search-bar"
+				onClick={() => {
+					console.log(kmlReady);
+				}}>
 				<span onClick={() => setSearchName(true)} className={searchName ? "active" : ""}>
 					Search by name
 				</span>
