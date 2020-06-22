@@ -1,10 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useRef, useEffect } from "react";
-import Axios from "axios";
+import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
 import "../styles/Map.css";
 import InputForm from "../components/Maps/InputForm";
-const AxiosCancelable = AxiosCancelRequest(Axios);
+const Axios = AxiosCancelRequest(axios);
 
 const MapComponent = () => {
 	const mapRef = useRef();
@@ -15,8 +15,6 @@ const MapComponent = () => {
 		lng: 106.8456,
 	});
 	const [data, setData] = useState({});
-	const [kmlReady, setKmlReady] = useState(false);
-	const [polygon, setPolygon] = useState([]);
 	const [inputLat, setInputLat] = useState("");
 	const [inputLng, setInputLng] = useState("");
 	const [formShow, setFormShow] = useState(false);
@@ -28,12 +26,11 @@ const MapComponent = () => {
 	let infoWindow;
 	let kmlLayer;
 	let autoComplete;
-	let polygonVar;
 
 	useEffect(() => {
 		// Create script element and call google maps api
 		const googleScript = document.createElement("script");
-		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_APIX}&libraries=places,geometry`;
+		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places,geometry`;
 		window.document.body.appendChild(googleScript);
 
 		googleScript.addEventListener("load", async () => {
@@ -46,41 +43,29 @@ const MapComponent = () => {
 		});
 	}, []);
 
-	const getPolygon = (lat: number, lng: number) => {
-		console.log(lng + "," + lat);
-		AxiosCancelable({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
+	const getLocation = (lat: number, lng: number) => {
+		Axios({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
 			.then((resolve) => {
-				const xxx = resolve.data.data[0].shape
+				setData(resolve.data.data[0]);
+				const polygon = resolve.data.data[0].shape
 					.slice(11, -2)
 					.split(", ")
 					.map((x: string) => {
 						const split = x.split(" ");
 						return { lat: parseFloat(split[1]), lng: parseFloat(split[0]) };
 					});
-				polygonVar = xxx;
-			})
-			.catch((reject) => {
-				if (!Axios.isCancel(reject)) {
-					console.log(reject);
-					setPolygon("failed");
-				}
-			});
-	};
-
-	const getLocation = (lat: number, lng: number) => {
-		AxiosCancelable({ url: `https://siis-api.udata.id/dm_get_dagri/${lat}/${lng}` })
-			.then((resolve) => {
-				setData(resolve.data[0]);
+				kmlLayer.setPath(polygon);
+				kmlLayer.setMap(googleMap);
 
 				// Cannot use React Element to create custom popup, must using string
 				const parentElement = document.getElementById("map-popup");
-				const { provinsi, kabupaten_kota, kecamatan, desa_kelurahan } = resolve.data[0];
+				const { provinsi, kabupaten, kecamatan, kelurahan } = resolve.data.data[0];
 				const child = `
 				<div>
 					<span>${provinsi}</span>
-					<span>${kabupaten_kota}</span>
+					<span>${kabupaten}</span>
 					<span>${kecamatan}</span>
-					<span>${desa_kelurahan}</span>
+					<span>${kelurahan}</span>
 					<span id="map-popup-edit">Edit Data</span>
 				</div>`;
 
@@ -94,7 +79,7 @@ const MapComponent = () => {
 				});
 			})
 			.catch((reject) => {
-				if (!Axios.isCancel(reject)) {
+				if (!axios.isCancel(reject)) {
 					console.log(reject);
 					const parentElement = document.getElementById("map-popup");
 					const child = `
@@ -117,7 +102,7 @@ const MapComponent = () => {
 
 	const createGoogleMap = (): any => {
 		return new window.google.maps.Map(mapRef.current, {
-			zoom: 16,
+			zoom: 15,
 			center: center,
 			clickableIcons: false,
 			fullscreenControl: false,
@@ -142,16 +127,12 @@ const MapComponent = () => {
 			position: center,
 		});
 		returnInfoWindow.open(googleMap);
-		// getLocation(center.lat, center.lng);
-		getPolygon(center.lat, center.lng);
+		getLocation(center.lat, center.lng);
 
 		return returnInfoWindow;
 	};
 
 	const createKmlLayer = (): any => {
-		const plg = getPolygon(center.lat, center.lng);
-		console.log(plg);
-
 		const returnPolygon = new window.google.maps.Polygon({
 			paths: [],
 			strokeColor: "#FF0000",
@@ -162,6 +143,7 @@ const MapComponent = () => {
 			clickable: false,
 		});
 		returnPolygon.setMap(googleMap);
+
 		return returnPolygon;
 	};
 
@@ -180,6 +162,9 @@ const MapComponent = () => {
 
 	const mapEventListener = (): void => {
 		// SearchBox event listener
+		// const dummyDiv = document.getElementsByClassName("map-padding")[0];
+		// googleMap.controls[window.google.maps.ControlPosition.TOP_CENTER].push(dummyDiv);
+
 		window.google.maps.event.addListener(autoComplete, "place_changed", () => {
 			const place = autoComplete.getPlace();
 			console.log(place);
@@ -205,11 +190,11 @@ const MapComponent = () => {
 			marker.setPosition(location);
 			marker.setVisible(true);
 
-			// getLocation(location.lat(), location.lng());
+			getLocation(location.lat(), location.lng());
 			kmlLayer.setMap(null);
 		});
 
-		marker.addListener("click", function () {
+		marker.addListener("click", (): void => {
 			if (!infoWindow.getMap()) {
 				const location = marker.getPosition();
 
@@ -218,17 +203,15 @@ const MapComponent = () => {
 				infoWindow.open(googleMap);
 				infoWindow.setPosition(location);
 
-				// getLocation(location.lat(), location.lng());
+				getLocation(location.lat(), location.lng());
 			}
-			console.log(polygonVar);
-			kmlLayer.setMap(googleMap);
 		});
 
-		marker.addListener("dragstart", () => {
+		marker.addListener("dragstart", (): void => {
 			infoWindow.close();
 		});
 
-		marker.addListener("dragend", function () {
+		marker.addListener("dragend", (): void => {
 			const location = marker.getPosition();
 
 			infoWindow.close();
@@ -236,7 +219,8 @@ const MapComponent = () => {
 			infoWindow.open(googleMap);
 			infoWindow.setPosition(location);
 
-			// getLocation(location.lat(), location.lng());
+			kmlLayer.setMap(null);
+			getLocation(location.lat(), location.lng());
 		});
 
 		// Maps on click event listener
@@ -244,29 +228,30 @@ const MapComponent = () => {
 			if (inputRef.current) inputRef.current.value = "";
 
 			infoWindow.close();
-			googleMap.panTo(e.latLng);
+			// googleMap.panTo(e.latLng);
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap);
 			infoWindow.setPosition(e.latLng);
-			// getLocation(e.latLng.lat(), e.latLng.lng());
+
+			kmlLayer.setMap(null);
+			getLocation(e.latLng.lat(), e.latLng.lng());
 
 			marker.setVisible(false);
 			marker.setPosition(e.latLng);
 			marker.setVisible(true);
 
-			kmlLayer.setMap(null);
-
-			// 	const elem = document.getElementsByClassName("map-search-bar");
-			// googleMap.control[window.google.maps.ControlPosition.TOP_CENTER].push(elem)
-
-			// kmlLayer = new window.google.maps.KmlLayer({
-			// 	url: "https://www.iuwashplus.or.id/work/filekml/3_dkijakarta2.kml",
-			// 	map: googleMap,
-			// 	clickable: false,
-			// });
+			// const www = new window.google.maps.LatLngBounds();
+			// www.extend(marker.getPosition());
+			// googleMap.fitBounds(www);
+			// if (e.tb.clientY <= 260) {
+			// 	const centerNow = googleMap.getCenter();
+			// 	setTimeout(() => {
+			// 		googleMap.panTo({ lat: centerNow.lat() + 0.005, lng: centerNow.lng() });
+			// 	}, 50);
+			// }
 		});
 
-		inputLatLng.current.addEventListener("submit", (e) => {
+		inputLatLng.current.addEventListener("submit", (e: Event): void => {
 			e.preventDefault();
 
 			// Cannot use React state, must using traditional way to get value
@@ -282,7 +267,7 @@ const MapComponent = () => {
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap);
 			infoWindow.setPosition(location);
-			// getLocation(location.lat, location.lng);
+			getLocation(location.lat, location.lng);
 
 			marker.setVisible(false);
 			marker.setPosition(location);
@@ -302,28 +287,15 @@ const MapComponent = () => {
 			setInputLng(value);
 		}
 	};
-	const onSubmitSearch = async (e) => {
-		e.preventDefault();
-
-		// infoWindow.close();
-		// googleMap.panTo(e.latLng);
-		// infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-		// infoWindow.open(googleMap);
-		// infoWindow.setPosition(e.latLng);
-		// getLocation(location.lat, location.lng);
-
-		// marker.setVisible(false);
-		// marker.setPosition(e.latLng);
-		// marker.setVisible(true);
-	};
 
 	return (
 		<div className="map-page">
+			{/* <div className="map-padding" style={{ width: "100%", height: 30, backgroundColor: "red" }} /> */}
 			<div className="map-container" ref={mapRef} />
 			<div
 				className="map-search-bar"
 				onClick={() => {
-					console.log(kmlReady);
+					console.log(1);
 				}}>
 				<span onClick={() => setSearchName(true)} className={searchName ? "active" : ""}>
 					Search by name

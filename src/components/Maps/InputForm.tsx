@@ -35,11 +35,11 @@ const InputForm = ({ data, show, hide }: Props) => {
 			<label>Provinsi :</label>
 			<input ref={provinsi} defaultValue={data.provinsi} required />
 			<label>Kabupaten/Kota :</label>
-			<input ref={kota} defaultValue={data.kabupaten_kota} required />
+			<input ref={kota} defaultValue={data.kabupaten} required />
 			<label>Kecamatan :</label>
 			<input ref={kecamatan} defaultValue={data.kecamatan} required />
 			<label>Desa/Kelurahan :</label>
-			<input ref={kelurahan} defaultValue={data.desa_kelurahan} required />
+			<input ref={kelurahan} defaultValue={data.kelurahan} required />
 			<label>Jalan :</label>
 			<input ref={jalan} defaultValue={data.jalan} />
 			<button type="submit">Submit</button>
@@ -52,9 +52,9 @@ const InputForm = ({ data, show, hide }: Props) => {
 
 interface Data {
 	provinsi: string;
-	kabupaten_kota: string;
+	kabupaten: string;
 	kecamatan: string;
-	desa_kelurahan: string;
+	kelurahan: string;
 	jalan?: string;
 }
 interface Props {
