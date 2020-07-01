@@ -3,33 +3,33 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
 import "../styles/Map.css";
-import InputForm from "../components/Maps/InputForm";
 import pin_red from "../images/pin_red.png";
 import pin_yellow from "../images/pin_yellow.png";
 import pin_green from "../images/pin_green.png";
 import pin_black from "../images/pin_black.png";
+import my_location from "../images/my_location.png";
 const AxiosLocation = AxiosCancelRequest(axios);
 const AxiosDirection = AxiosCancelRequest(axios);
+const center = {
+	lat: -6.2088,
+	lng: 106.8456,
+};
 
 const MapComponent = () => {
 	const mapRef = useRef();
 	const inputRef = useRef();
 	const inputLatLng = useRef();
-	const [center, setCenter] = useState({
-		lat: -6.2088,
-		lng: 106.8456,
-	});
-	const [data, setData] = useState({});
+	const radiusRef = useRef();
 	const [inputLat, setInputLat] = useState("");
 	const [inputLng, setInputLng] = useState("");
-	const [formShow, setFormShow] = useState(false);
+	const [inputRadius, setInputRadius] = useState(200);
 	const [searchName, setSearchName] = useState(true);
 
 	// Initialize an variables to call it later
 	let googleMap;
 	let marker;
 	let infoWindow;
-	let kmlLayer;
+	let polygon;
 	let autoComplete;
 	let odpMarker = [];
 	let directionsService;
@@ -42,37 +42,82 @@ const MapComponent = () => {
 		window.document.body.appendChild(googleScript);
 
 		googleScript.addEventListener("load", async () => {
-			googleMap = await createGoogleMap();
-			marker = await createMarker();
-			infoWindow = await createInfoWindow();
-			autoComplete = await createAutoComplete();
-			kmlLayer = await createKmlLayer();
-			mapEventListener();
+			// Maps initialize
+			googleMap = new window.google.maps.Map(mapRef.current, {
+				zoom: 15,
+				center: center,
+				clickableIcons: false,
+				fullscreenControl: false,
+				mapTypeControl: true,
+				mapTypeControlOptions: {
+					position: window.google.maps.ControlPosition.BOTTOM_CENTER,
+				},
+			});
+
+			// Marker initialize
+			marker = new window.google.maps.Marker({
+				map: googleMap,
+				draggable: true,
+				visible: false,
+			});
+
+			// InfoWindow initialize
+			infoWindow = new window.google.maps.InfoWindow();
+
+			// AutoComplete initialize, cannot use useRef to get element
+			const inputElement = document.getElementById("map-search-name");
+			autoComplete = new window.google.maps.places.Autocomplete(inputElement, {
+				fields: ["geometry", "name"],
+				types: ["geocode"],
+				componentRestrictions: { country: ["id"] },
+			});
+			autoComplete.bindTo("bounds", googleMap);
+
+			// Polygon initialize
+			polygon = new window.google.maps.Polygon({
+				map: googleMap,
+				paths: [],
+				strokeColor: "#FF0000",
+				strokeOpacity: 0.5,
+				strokeWeight: 2,
+				fillColor: "#FF0000",
+				fillOpacity: 0.1,
+				clickable: false,
+			});
+
+			// Directions initialize
 			directionsService = new window.google.maps.DirectionsService();
 			directionsRenderer = new window.google.maps.DirectionsRenderer({
-				map: googleMap,
 				suppressMarkers: true,
 				preserveViewport: true,
-				// polylineOptions: {
-				// 	strokeColor: "green",
-				// },
 			});
+
+			const searchBar = document.getElementsByClassName("map-search-bar")[0];
+			const findMeIcon = document.getElementsByClassName("map-find-me")[0];
+			const radiusSlider = document.getElementsByClassName("map-radius-slider")[0];
+			googleMap.controls[window.google.maps.ControlPosition.TOP_LEFT].push(searchBar);
+			googleMap.controls[window.google.maps.ControlPosition.RIGHT_BOTTOM].push(findMeIcon);
+			googleMap.controls[window.google.maps.ControlPosition.TOP_LEFT].push(radiusSlider);
+
+			mapEventListener();
 		});
 	}, []);
 
 	const getLocation = (lat: number, lng: number) => {
+		odpMarker.map((x) => x.setMap(null));
+		if (directionsRenderer) directionsRenderer.setMap(null);
+
 		AxiosLocation({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
 			.then((resolve) => {
-				setData(resolve.data.data[0]);
-				const polygon = resolve.data.data[0].shape
+				const polygonLayer = resolve.data.data[0].shape
 					.slice(11, -2)
 					.split(", ")
 					.map((x: string) => {
 						const split = x.split(" ");
 						return { lat: parseFloat(split[1]), lng: parseFloat(split[0]) };
 					});
-				kmlLayer.setPath(polygon);
-				kmlLayer.setMap(googleMap);
+				polygon.setPath(polygonLayer);
+				polygon.setMap(googleMap);
 
 				// Cannot use React Element to create custom popup, must using string
 				const parentElement = document.getElementById("map-popup");
@@ -89,12 +134,6 @@ const MapComponent = () => {
 
 					parentElement.innerHTML = "";
 					parentElement.insertAdjacentHTML("beforeend", child);
-					// document.getElementById("map-popup-edit").addEventListener("click", () => {
-					// 	document.getElementById("map-input-form").style.display = "grid";
-					// 	setTimeout(() => {
-					// 		setFormShow(true);
-					// 	}, 10);
-					// });
 				}
 
 				getDirection(lat, lng);
@@ -122,17 +161,16 @@ const MapComponent = () => {
 	};
 
 	const getDirection = (lat: number, lng: number): void => {
-		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: 200 }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
+		console.log(radiusRef.current.value);
+		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
 				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
 				const loading = document.getElementById("map-popup-odp-loading");
 				loading.innerHTML = `Found ${odpData.length} ODP available`;
-				odpMarker.map((x) => x.setMap(null));
 				odpMarker = [];
 				googleMap.setCenter({ lat: lat, lng: lng });
-				googleMap.setZoom(17);
+				if (odpData.length) googleMap.setZoom(17);
 
-				console.log(odpData);
 				odpData.forEach((x, i) => {
 					const data = x.attributes;
 					let pin: string;
@@ -148,7 +186,6 @@ const MapComponent = () => {
 							break;
 						default:
 							pin = pin_black;
-							break;
 					}
 
 					odpMarker.push(
@@ -163,6 +200,7 @@ const MapComponent = () => {
 							},
 						}),
 					);
+
 					odpMarker[i].infoWindow = new window.google.maps.InfoWindow({
 						content: `<div>
 						<span>Latitude: ${data.lat}</span><br/>
@@ -174,14 +212,17 @@ const MapComponent = () => {
 						<span>Idle port: ${data.portidlenumber}</span>
 					</div>`,
 					});
+
 					odpMarker[i].addListener("mouseover", () => {
 						infoWindow.close();
 						odpMarker.map((x) => x.infoWindow.close());
 						odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
 					});
+
 					odpMarker[i].addListener("mouseout", () => {
 						odpMarker[i].infoWindow.close();
 					});
+
 					odpMarker[i].addListener("click", () => {
 						infoWindow.close();
 						odpMarker.map((x) => x.infoWindow.close());
@@ -194,6 +235,7 @@ const MapComponent = () => {
 							},
 							(response, status) => {
 								if (status === "OK") {
+									directionsRenderer.setMap(googleMap);
 									directionsRenderer.setDirections(response);
 								} else {
 									window.alert("Directions request failed due to " + status);
@@ -212,65 +254,9 @@ const MapComponent = () => {
 			});
 	};
 
-	const createGoogleMap = (): any => {
-		return new window.google.maps.Map(mapRef.current, {
-			zoom: 15,
-			center: center,
-			clickableIcons: false,
-			fullscreenControl: false,
-			mapTypeControl: true,
-			mapTypeControlOptions: {
-				position: window.google.maps.ControlPosition.BOTTOM_CENTER,
-			},
-		});
-	};
-
-	const createMarker = (): any => {
-		return new window.google.maps.Marker({
-			map: googleMap,
-			draggable: true,
-			visible: false,
-		});
-	};
-
-	const createInfoWindow = (): any => {
-		return new window.google.maps.InfoWindow();
-	};
-
-	const createKmlLayer = (): any => {
-		return new window.google.maps.Polygon({
-			map: googleMap,
-			paths: [],
-			strokeColor: "#FF0000",
-			strokeOpacity: 0.5,
-			strokeWeight: 2,
-			fillColor: "#FF0000",
-			fillOpacity: 0.1,
-			clickable: false,
-		});
-	};
-
-	const createAutoComplete = (): any => {
-		// Cannot use useRef() to get element
-		const inputElement = document.getElementById("map-search-name");
-		const inputReturn = new window.google.maps.places.Autocomplete(inputElement);
-
-		inputReturn.bindTo("bounds", googleMap);
-		inputReturn.setTypes(["geocode"]);
-		inputReturn.setComponentRestrictions({ country: ["id"] });
-		inputReturn.setFields(["geometry", "name"]);
-
-		return inputReturn;
-	};
-
 	const mapEventListener = (): void => {
-		// SearchBox event listener
-		// const dummyDiv = document.getElementsByClassName("map-padding")[0];
-		// googleMap.controls[window.google.maps.ControlPosition.TOP_CENTER].push(dummyDiv);
-
 		window.google.maps.event.addListener(autoComplete, "place_changed", () => {
 			const place = autoComplete.getPlace();
-			console.log(place);
 			if (!place.geometry) {
 				alert("Quota exceeded!");
 				return;
@@ -290,7 +276,7 @@ const MapComponent = () => {
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap, marker);
 
-			kmlLayer.setMap(null);
+			polygon.setMap(null);
 			getLocation(location.lat(), location.lng());
 		});
 
@@ -315,33 +301,21 @@ const MapComponent = () => {
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap, marker);
 
-			kmlLayer.setMap(null);
+			polygon.setMap(null);
 			getLocation(location.lat(), location.lng());
 		});
 
-		// Maps on click event listener
 		googleMap.addListener("click", (e: any): void => {
 			if (inputRef.current) inputRef.current.value = "";
 
 			marker.setPosition(e.latLng);
 			marker.setVisible(true);
 
-			// googleMap.panTo(e.latLng);
 			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
 			infoWindow.open(googleMap, marker);
 
-			kmlLayer.setMap(null);
+			polygon.setMap(null);
 			getLocation(e.latLng.lat(), e.latLng.lng());
-
-			// const www = new window.google.maps.LatLngBounds();
-			// www.extend(marker.getPosition());
-			// googleMap.fitBounds(www);
-			// if (e.tb.clientY <= 260) {
-			// 	const centerNow = googleMap.getCenter();
-			// 	setTimeout(() => {
-			// 		googleMap.panTo({ lat: centerNow.lat() + 0.005, lng: centerNow.lng() });
-			// 	}, 50);
-			// }
 		});
 
 		inputLatLng.current.addEventListener("submit", (e: Event): void => {
@@ -365,6 +339,37 @@ const MapComponent = () => {
 		});
 	};
 
+	const findMe = () => {
+		if (navigator.geolocation) {
+			navigator.geolocation.getCurrentPosition(
+				({ coords }) => {
+					if (inputRef.current) inputRef.current.value = "";
+					const position = {
+						lat: coords.latitude,
+						lng: coords.longitude,
+					};
+
+					marker.setPosition(position);
+					marker.setVisible(true);
+
+					infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+					infoWindow.open(googleMap, marker);
+					polygon.setMap(null);
+
+					googleMap.setCenter(position);
+					googleMap.setZoom(17);
+
+					getLocation(coords.latitude, coords.longitude);
+				},
+				() => {
+					alert("The Geolocation service failed.");
+				},
+			);
+		} else {
+			alert("Your browser doesn't support geolocation.");
+		}
+	};
+
 	const onChangeLat = (value?: string): void => {
 		const regex = /^[0-9.-]*$/;
 		if (regex.test(value)) {
@@ -380,20 +385,16 @@ const MapComponent = () => {
 
 	return (
 		<div className="map-page">
-			{/* <div className="map-padding" style={{ width: "100%", height: 30, backgroundColor: "red" }} /> */}
 			<div className="map-container" ref={mapRef} />
-			<div
-				className="map-search-bar"
-				onClick={() => {
-					console.log(1);
-				}}>
-				<span onClick={() => setSearchName(true)} className={searchName ? "active" : ""}>
-					Search by name
-				</span>
-				<span onClick={() => setSearchName(false)} className={searchName ? "" : "active"}>
-					Search by latlong
-				</span>
-				<br />
+			<div className="map-search-bar">
+				<div className="map-search-option">
+					<div onClick={() => setSearchName(true)} className={searchName ? "active" : ""}>
+						Search by name
+					</div>
+					<div onClick={() => setSearchName(false)} className={searchName ? "" : "active"}>
+						Search by latlong
+					</div>
+				</div>
 				<input id="map-search-name" ref={inputRef} placeholder="Search here..." style={{ display: searchName ? "inline-block" : "none" }} />
 				<form ref={inputLatLng} style={{ display: !searchName ? "block" : "none" }}>
 					<input placeholder="Latitude" value={inputLat} onChange={(e) => onChangeLat(e.target.value)} />
@@ -402,8 +403,24 @@ const MapComponent = () => {
 					<button type="submit">Search</button>
 				</form>
 			</div>
-			<div className={"map-input-bg" + (formShow ? " show" : "")} />
-			<InputForm show={formShow} hide={() => setFormShow(false)} data={data} />
+			<div className="map-find-me" onClick={findMe}>
+				<img src={my_location} alt="find_me" />
+			</div>
+			<div className="map-radius-slider">
+				<input
+					type="range"
+					ref={radiusRef}
+					min="100"
+					max="300"
+					step="25"
+					value={inputRadius}
+					onChange={(e) => {
+						setInputRadius(e.target.value);
+					}}
+				/>
+				<br />
+				<span>Radius: {inputRadius}</span>
+			</div>
 		</div>
 	);
 };
