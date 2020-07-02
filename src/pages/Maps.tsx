@@ -364,6 +364,7 @@ const MapComponent = () => {
 				() => {
 					alert("The Geolocation service failed.");
 				},
+				{ timeout: 30000, enableHighAccuracy: true, maximumAge: 75000 },
 			);
 		} else {
 			alert("Your browser doesn't support geolocation.");
