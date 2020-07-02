@@ -39,7 +39,7 @@
     "workbox-webpack-plugin": "^5.1.3"
   },
   "scripts": {
-    "start": "webpack-dev-server --open --config webpack.dev.js",
+    "start": "webpack-dev-server --https --cert ./localhost+2.pem --key ./localhost+2-key.pem --open --config webpack.dev.js",
     "build": "webpack --config webpack.prod.js"
   },
   "keywords": [],
