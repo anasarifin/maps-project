@@ -15,15 +15,28 @@ const center = {
 	lng: 106.8456,
 };
 
+function titleCase(str: String) {
+	return str
+		.toLowerCase()
+		.split(" ")
+		.map(function (word) {
+			return word.replace(word[0], word[0].toUpperCase());
+		})
+		.join(" ");
+}
+
 const MapComponent = () => {
 	const mapRef = useRef();
 	const inputRef = useRef();
-	const inputLatLng = useRef();
+	const bottomRef = useRef();
 	const radiusRef = useRef();
-	const [inputLat, setInputLat] = useState("");
-	const [inputLng, setInputLng] = useState("");
+	const [data, setData] = useState("");
+	const [status, setStatus] = useState("");
+	const [odpStatus, setOdpStatus] = useState("");
+	const [touchStart, setTouchStart] = useState();
 	const [inputRadius, setInputRadius] = useState(200);
-	const [searchName, setSearchName] = useState(true);
+	const [bottomShow, setBottomShow] = useState(false);
+	const [bottomFirstShow, setBottomFirstShow] = useState(true);
 
 	// Initialize an variables to call it later
 	let googleMap;
@@ -38,7 +51,7 @@ const MapComponent = () => {
 	useEffect(() => {
 		// Create script element and call google maps api
 		const googleScript = document.createElement("script");
-		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places,geometry`;
+		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_APIX}&libraries=places,geometry`;
 		window.document.body.appendChild(googleScript);
 
 		googleScript.addEventListener("load", async () => {
@@ -47,8 +60,8 @@ const MapComponent = () => {
 				zoom: 15,
 				center: center,
 				clickableIcons: false,
-				fullscreenControl: false,
-				mapTypeControl: true,
+				disableDefaultUI: true,
+				gestureHandling: "greedy",
 				mapTypeControlOptions: {
 					position: window.google.maps.ControlPosition.BOTTOM_CENTER,
 				},
@@ -65,7 +78,7 @@ const MapComponent = () => {
 			infoWindow = new window.google.maps.InfoWindow();
 
 			// AutoComplete initialize, cannot use useRef to get element
-			const inputElement = document.getElementById("map-search-name");
+			const inputElement = document.getElementById("map-search-mobile");
 			autoComplete = new window.google.maps.places.Autocomplete(inputElement, {
 				fields: ["geometry", "name"],
 				types: ["geocode"],
@@ -79,9 +92,8 @@ const MapComponent = () => {
 				paths: [],
 				strokeColor: "#FF0000",
 				strokeOpacity: 0.5,
-				strokeWeight: 2,
-				fillColor: "#FF0000",
-				fillOpacity: 0.1,
+				strokeWeight: 3,
+				fillOpacity: 0,
 				clickable: false,
 			});
 
@@ -91,13 +103,6 @@ const MapComponent = () => {
 				suppressMarkers: true,
 				preserveViewport: true,
 			});
-
-			const searchBar = document.getElementsByClassName("map-search-bar")[0];
-			const findMeIcon = document.getElementsByClassName("map-find-me")[0];
-			const radiusSlider = document.getElementsByClassName("map-radius-slider")[0];
-			googleMap.controls[window.google.maps.ControlPosition.TOP_LEFT].push(searchBar);
-			googleMap.controls[window.google.maps.ControlPosition.RIGHT_BOTTOM].push(findMeIcon);
-			googleMap.controls[window.google.maps.ControlPosition.TOP_LEFT].push(radiusSlider);
 
 			mapEventListener();
 		});
@@ -109,7 +114,8 @@ const MapComponent = () => {
 
 		AxiosLocation({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
 			.then((resolve) => {
-				const polygonLayer = resolve.data.data[0].shape
+				const { provinsi, kabupaten, kecamatan, kelurahan, shape } = resolve.data.data[0];
+				const polygonLayer = shape
 					.slice(11, -2)
 					.split(", ")
 					.map((x: string) => {
@@ -118,55 +124,27 @@ const MapComponent = () => {
 					});
 				polygon.setPath(polygonLayer);
 				polygon.setMap(googleMap);
+				const kota = kabupaten.split(" ")[0] === "KOTA" ? kabupaten.replace("KOTA ", "") : kabupaten;
 
-				// Cannot use React Element to create custom popup, must using string
-				const parentElement = document.getElementById("map-popup");
-				if (parentElement) {
-					const { provinsi, kabupaten, kecamatan, kelurahan } = resolve.data.data[0];
-					const child = `
-				<div>
-					<span>${provinsi}</span>
-					<span>${kabupaten}</span>
-					<span>${kecamatan}</span>
-					<span>${kelurahan}</span><br/>
-					<span id="map-popup-odp-loading">Fetching ODP data...</span>
-				</div>`;
+				const name = `Kel. ${titleCase(kelurahan)}, Kec. ${titleCase(kecamatan)}, ${kota ? "Kota" : "Kab."} ${titleCase(kota)}, ${titleCase(provinsi).replace("Dki", "DKI")}`;
 
-					parentElement.innerHTML = "";
-					parentElement.insertAdjacentHTML("beforeend", child);
-				}
-
+				setData(name);
+				setOdpStatus("Fetching ODP data...");
 				getDirection(lat, lng);
 			})
 			.catch((reject) => {
 				if (!axios.isCancel(reject)) {
 					console.log(reject);
-					const parentElement = document.getElementById("map-popup");
-					const child = `
-					<div>
-						<div>Fetching failed !</div>
-						<span id="map-popup-edit">Try again...</span>
-					</div>
-					`;
-
-					parentElement.innerHTML = "";
-					parentElement.insertAdjacentHTML("beforeend", child);
-					document.getElementById("map-popup-edit").addEventListener("click", () => {
-						infoWindow.setContent(`<div id="map-popup">Fetching again...</div>`);
-						const position = marker.getPosition();
-						getLocation(position.lat(), position.lng());
-					});
+					setStatus("Fetching failed!");
 				}
 			});
 	};
 
 	const getDirection = (lat: number, lng: number): void => {
-		console.log(radiusRef.current.value);
 		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
 				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
-				const loading = document.getElementById("map-popup-odp-loading");
-				loading.innerHTML = `Found ${odpData.length} ODP available`;
+				setOdpStatus(`${odpData.length} ODP available`);
 				odpMarker = [];
 				googleMap.setCenter({ lat: lat, lng: lng });
 				if (odpData.length) googleMap.setZoom(17);
@@ -248,8 +226,7 @@ const MapComponent = () => {
 			.catch((reject) => {
 				if (!axios.isCancel(reject)) {
 					console.log(reject);
-					const loading = document.getElementById("map-popup-odp-loading");
-					loading.innerHTML = `Fetching ODP failed!`;
+					setOdpStatus("Fetching ODP failed!");
 				}
 			});
 	};
@@ -273,8 +250,7 @@ const MapComponent = () => {
 			marker.setPosition(location);
 			marker.setVisible(true);
 
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
+			setStatus("Fetching data...");
 
 			polygon.setMap(null);
 			getLocation(location.lat(), location.lng());
@@ -286,20 +262,10 @@ const MapComponent = () => {
 			}
 		});
 
-		marker.addListener("mouseover", (): void => {
-			odpMarker.map((x) => x.infoWindow.close());
-			infoWindow.open(googleMap, marker);
-		});
-
-		marker.addListener("dragstart", (): void => {
-			infoWindow.close();
-		});
-
 		marker.addListener("dragend", (): void => {
 			const location = marker.getPosition();
 
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
+			setStatus("Fetching data...");
 
 			polygon.setMap(null);
 			getLocation(location.lat(), location.lng());
@@ -311,31 +277,10 @@ const MapComponent = () => {
 			marker.setPosition(e.latLng);
 			marker.setVisible(true);
 
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
+			setStatus("Fetching data...");
 
 			polygon.setMap(null);
 			getLocation(e.latLng.lat(), e.latLng.lng());
-		});
-
-		inputLatLng.current.addEventListener("submit", (e: Event): void => {
-			e.preventDefault();
-
-			// Cannot use React state, must using traditional way to get value
-			const element = inputLatLng.current.querySelectorAll("input");
-			const location = {
-				lat: parseFloat(element[0].value) || 0,
-				lng: parseFloat(element[1].value) || 0,
-			};
-
-			marker.setPosition(location);
-			marker.setVisible(true);
-			googleMap.panTo(location);
-
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
-
-			getLocation(location.lat, location.lng);
 		});
 	};
 
@@ -364,46 +309,44 @@ const MapComponent = () => {
 				() => {
 					alert("The Geolocation service failed.");
 				},
-				{ timeout: 30000, enableHighAccuracy: true, maximumAge: 75000 },
 			);
 		} else {
 			alert("Your browser doesn't support geolocation.");
 		}
 	};
 
-	const onChangeLat = (value?: string): void => {
-		const regex = /^[0-9.-]*$/;
-		if (regex.test(value)) {
-			setInputLat(value);
+	const touchMoveHandler = (e: TouchEvent) => {
+		const touchPos = e.changedTouches[0].clientY;
+		let touchStartEdge = window.innerHeight - touchStart;
+		let value = window.innerHeight - touchPos + touchStartEdge;
+		if (bottomShow) {
+			touchStartEdge = 300 - (window.innerHeight - touchStart);
+			value = 300 - (touchPos - (window.innerHeight - 300) - touchStartEdge);
+
+			window;
 		}
+
+		if (value > 300) value = 300;
+		bottomRef.current.style.transition = "none";
+		bottomRef.current.style.bottom = value + "px";
 	};
-	const onChangeLng = (value?: string): void => {
-		const regex = /^[0-9.-]*$/;
-		if (regex.test(value)) {
-			setInputLng(value);
+
+	const touchEndHandler = () => {
+		const bottomPos = Number(bottomRef.current.style.bottom.replace("px", ""));
+		if (bottomPos > 150) {
+			bottomRef.current.style.transition = ".3s";
+			bottomRef.current.style.bottom = "300px";
+			setBottomShow(true);
+		} else {
+			bottomRef.current.style.transition = ".3s";
+			bottomRef.current.style.bottom = bottomFirstShow ? "20px" : "70px";
+			setBottomShow(false);
 		}
 	};
 
 	return (
-		<div className="map-page">
+		<div className="map-page" style={{ height: window.innerHeight }}>
 			<div className="map-container" ref={mapRef} />
-			<div className="map-search-bar">
-				<div className="map-search-option">
-					<div onClick={() => setSearchName(true)} className={searchName ? "active" : ""}>
-						Search by name
-					</div>
-					<div onClick={() => setSearchName(false)} className={searchName ? "" : "active"}>
-						Search by latlong
-					</div>
-				</div>
-				<input id="map-search-name" ref={inputRef} placeholder="Search here..." style={{ display: searchName ? "inline-block" : "none" }} />
-				<form ref={inputLatLng} style={{ display: !searchName ? "block" : "none" }}>
-					<input placeholder="Latitude" value={inputLat} onChange={(e) => onChangeLat(e.target.value)} />
-					<br />
-					<input placeholder="Longitude" value={inputLng} onChange={(e) => onChangeLng(e.target.value)} />
-					<button type="submit">Search</button>
-				</form>
-			</div>
 			<div className="map-find-me" onClick={findMe}>
 				<img src={my_location} alt="find_me" />
 			</div>
@@ -421,6 +364,22 @@ const MapComponent = () => {
 				/>
 				<br />
 				<span>Radius: {inputRadius}</span>
+			</div>
+			<div id="map-search-mobile">
+				<input placeholder="Search here..." />
+				<img src={my_location} alt="find-me" />
+			</div>
+			<div
+				className="map-bottom"
+				ref={bottomRef}
+				style={{ bottom: bottomFirstShow ? 20 : 70 }}
+				onTouchStart={(e: TouchEvent) => {
+					setTouchStart(e.touches[0].clientY);
+				}}
+				onTouchMove={touchMoveHandler}
+				onTouchEnd={touchEndHandler}>
+				<div className="map-bottom-data">{data}</div>
+				<div className="map-bottom-odp">{odpStatus}</div>
 			</div>
 		</div>
 	);
