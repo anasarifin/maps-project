@@ -30,18 +30,21 @@ const MapComponent = () => {
 	const inputRef = useRef();
 	const bottomRef = useRef();
 	const radiusRef = useRef();
+	const zoomInRef = useRef();
+	const zoomOutRef = useRef();
 	const [data, setData] = useState("");
-	const [status, setStatus] = useState("");
+	const [status, setStatus] = useState("No location selected.");
+	const [loading, setLoading] = useState(true);
 	const [odpStatus, setOdpStatus] = useState("");
 	const [touchStart, setTouchStart] = useState();
 	const [inputRadius, setInputRadius] = useState(200);
 	const [bottomShow, setBottomShow] = useState(false);
-	const [bottomFirstShow, setBottomFirstShow] = useState(true);
 
 	// Initialize an variables to call it later
 	let googleMap;
 	let marker;
 	let infoWindow;
+	let circle;
 	let polygon;
 	let autoComplete;
 	let odpMarker = [];
@@ -74,9 +77,6 @@ const MapComponent = () => {
 				visible: false,
 			});
 
-			// InfoWindow initialize
-			infoWindow = new window.google.maps.InfoWindow();
-
 			// AutoComplete initialize, cannot use useRef to get element
 			const inputElement = document.getElementById("map-search-mobile");
 			autoComplete = new window.google.maps.places.Autocomplete(inputElement, {
@@ -86,13 +86,23 @@ const MapComponent = () => {
 			});
 			autoComplete.bindTo("bounds", googleMap);
 
+			// Radius circle initialize
+			circle = new window.google.maps.Circle({
+				map: googleMap,
+				strokeColor: "#FF0000",
+				strokeOpacity: 0,
+				strokeWeight: 0,
+				fillColor: "#FF0000",
+				fillOpacity: 0.25,
+			});
+
 			// Polygon initialize
 			polygon = new window.google.maps.Polygon({
 				map: googleMap,
 				paths: [],
 				strokeColor: "#FF0000",
 				strokeOpacity: 0.5,
-				strokeWeight: 3,
+				strokeWeight: 2,
 				fillOpacity: 0,
 				clickable: false,
 			});
@@ -108,9 +118,19 @@ const MapComponent = () => {
 		});
 	}, []);
 
-	const getLocation = (lat: number, lng: number) => {
+	const getLocation = (lat: number, lng: number, show?: boolean) => {
 		odpMarker.map((x) => x.setMap(null));
 		if (directionsRenderer) directionsRenderer.setMap(null);
+
+		googleMap.panTo({ lat, lng });
+
+		circle.setMap(null);
+		circle.setMap(googleMap);
+		circle.setCenter({ lat, lng });
+		circle.setRadius(200);
+
+		setLoading(true);
+		setStatus("Fetching data...");
 
 		AxiosLocation({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
 			.then((resolve) => {
@@ -128,6 +148,7 @@ const MapComponent = () => {
 
 				const name = `Kel. ${titleCase(kelurahan)}, Kec. ${titleCase(kecamatan)}, ${kota ? "Kota" : "Kab."} ${titleCase(kota)}, ${titleCase(provinsi).replace("Dki", "DKI")}`;
 
+				setLoading(false);
 				setData(name);
 				setOdpStatus("Fetching ODP data...");
 				getDirection(lat, lng);
@@ -141,13 +162,15 @@ const MapComponent = () => {
 	};
 
 	const getDirection = (lat: number, lng: number): void => {
-		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
+		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: 200 }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
 				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
-				setOdpStatus(`${odpData.length} ODP available`);
+				setOdpStatus(`${odpData.length} ODP found`);
 				odpMarker = [];
 				googleMap.setCenter({ lat: lat, lng: lng });
 				if (odpData.length) googleMap.setZoom(17);
+				if (bottomRef.current.dataset.show === "true") googleMap.panBy(0, 70);
+				console.log(bottomRef.current.dataset);
 
 				odpData.forEach((x, i) => {
 					const data = x.attributes;
@@ -192,7 +215,6 @@ const MapComponent = () => {
 					});
 
 					odpMarker[i].addListener("mouseover", () => {
-						infoWindow.close();
 						odpMarker.map((x) => x.infoWindow.close());
 						odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
 					});
@@ -202,7 +224,6 @@ const MapComponent = () => {
 					});
 
 					odpMarker[i].addListener("click", () => {
-						infoWindow.close();
 						odpMarker.map((x) => x.infoWindow.close());
 						odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
 						directionsService.route(
@@ -256,10 +277,16 @@ const MapComponent = () => {
 			getLocation(location.lat(), location.lng());
 		});
 
+		window.google.maps.event.addDomListener(zoomInRef.current, "click", () => {
+			googleMap.setZoom(googleMap.getZoom() + 1);
+		});
+
+		window.google.maps.event.addDomListener(zoomOutRef.current, "click", () => {
+			googleMap.setZoom(googleMap.getZoom() - 1);
+		});
+
 		marker.addListener("click", (): void => {
-			if (!infoWindow.getMap()) {
-				infoWindow.open(googleMap, marker);
-			}
+			console.log(bottomShow);
 		});
 
 		marker.addListener("dragend", (): void => {
@@ -297,8 +324,6 @@ const MapComponent = () => {
 					marker.setPosition(position);
 					marker.setVisible(true);
 
-					infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-					infoWindow.open(googleMap, marker);
 					polygon.setMap(null);
 
 					googleMap.setCenter(position);
@@ -320,26 +345,26 @@ const MapComponent = () => {
 		let touchStartEdge = window.innerHeight - touchStart;
 		let value = window.innerHeight - touchPos + touchStartEdge;
 		if (bottomShow) {
-			touchStartEdge = 300 - (window.innerHeight - touchStart);
-			value = 300 - (touchPos - (window.innerHeight - 300) - touchStartEdge);
+			touchStartEdge = 200 - (window.innerHeight - touchStart);
+			value = 200 - (touchPos - (window.innerHeight - 200) - touchStartEdge);
 
 			window;
 		}
 
-		if (value > 300) value = 300;
+		if (value > 200) value = 200;
 		bottomRef.current.style.transition = "none";
 		bottomRef.current.style.bottom = value + "px";
 	};
 
 	const touchEndHandler = () => {
 		const bottomPos = Number(bottomRef.current.style.bottom.replace("px", ""));
-		if (bottomPos > 150) {
+		if (bottomPos > 100) {
 			bottomRef.current.style.transition = ".3s";
-			bottomRef.current.style.bottom = "300px";
+			bottomRef.current.style.bottom = "200px";
 			setBottomShow(true);
 		} else {
 			bottomRef.current.style.transition = ".3s";
-			bottomRef.current.style.bottom = bottomFirstShow ? "20px" : "70px";
+			bottomRef.current.style.bottom = "20px";
 			setBottomShow(false);
 		}
 	};
@@ -347,39 +372,42 @@ const MapComponent = () => {
 	return (
 		<div className="map-page" style={{ height: window.innerHeight }}>
 			<div className="map-container" ref={mapRef} />
-			<div className="map-find-me" onClick={findMe}>
+			<div className="map-find-me" onClick={() => {}}>
 				<img src={my_location} alt="find_me" />
 			</div>
-			<div className="map-radius-slider">
-				<input
-					type="range"
-					ref={radiusRef}
-					min="100"
-					max="300"
-					step="25"
-					value={inputRadius}
-					onChange={(e) => {
-						setInputRadius(e.target.value);
+			<div className="map-top">
+				<input placeholder="Search here..." className="map-top-search" />
+				<img
+					src={my_location}
+					alt="find-me"
+					className="map-top-findme"
+					onClick={() => {
+						console.log(bottomShow);
 					}}
 				/>
-				<br />
-				<span>Radius: {inputRadius}</span>
 			</div>
-			<div id="map-search-mobile">
-				<input placeholder="Search here..." />
-				<img src={my_location} alt="find-me" />
-			</div>
+			<div className="map-radius-icon" />
 			<div
 				className="map-bottom"
 				ref={bottomRef}
-				style={{ bottom: bottomFirstShow ? 20 : 70 }}
+				data-show={bottomShow}
 				onTouchStart={(e: TouchEvent) => {
 					setTouchStart(e.touches[0].clientY);
 				}}
 				onTouchMove={touchMoveHandler}
 				onTouchEnd={touchEndHandler}>
-				<div className="map-bottom-data">{data}</div>
-				<div className="map-bottom-odp">{odpStatus}</div>
+				<div className="map-zoom">
+					<img alt="plus" ref={zoomInRef} />
+					<img alt="minus" ref={zoomOutRef} />
+				</div>
+				{loading ? (
+					<div className="map-bottom-nopick">{status}</div>
+				) : (
+					<>
+						<div className="map-bottom-data">{data}</div>
+						<div className="map-bottom-odp">{odpStatus}</div>
+					</>
+				)}
 			</div>
 		</div>
 	);
