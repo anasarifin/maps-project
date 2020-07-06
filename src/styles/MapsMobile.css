@@ -1,0 +1,124 @@
+body {
+	overscroll-behavior: contain;
+	overflow: hidden;
+}
+img:press {
+	outline: none;
+}
+.map-page {
+	width: 100vw;
+}
+.map-container {
+	width: 100%;
+	height: 100%;
+}
+.map-top {
+	position: fixed;
+	display: grid;
+	grid-template-columns: auto 50px;
+	top: 10px;
+	width: 95%;
+	max-width: 600px;
+	height: 50px;
+	background-color: white;
+	border-radius: 5px;
+	left: 50%;
+	transform: translate(-50%);
+	box-shadow: 0 2px 4px 2px rgba(0, 0, 0, 0.4);
+}
+.map-top-search {
+	outline: none;
+	padding-left: 17px;
+	border: none;
+	border-radius: 5px;
+}
+.map-top-findme {
+	justify-self: center;
+	align-self: center;
+}
+.map-radius-icon {
+	position: absolute;
+	right: 10px;
+	top: 80px;
+	width: 40px;
+	height: 40px;
+	background-color: salmon;
+	z-index: 2;
+	border-radius: 5px;
+	box-shadow: 0 2px 4px 2px rgba(0, 0, 0, 0.4);
+}
+.map-radius-con {
+	position: absolute;
+	display: grid;
+	grid-template-columns: 1fr;
+	justify-items: center;
+	vertical-align: center;
+	top: 80px;
+	width: 95%;
+	max-width: 600px;
+	height: 100px;
+	font-size: larger;
+	font-weight: bold;
+	background-color: white;
+	box-sizing: border-box;
+	padding: 20px;
+	border-radius: 5px;
+	left: 50%;
+	transform: translate(-50%);
+	box-shadow: 0 2px 4px 2px rgba(0, 0, 0, 0.4);
+	z-index: 4;
+}
+.map-radius-con input {
+	width: 80%;
+}
+.map-radius-bg {
+	position: fixed;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 3;
+}
+.map-bottom {
+	position: fixed;
+	bottom: 20px;
+	width: 100%;
+	height: 200px;
+	background-color: white;
+	border-radius: 15px 15px 0 0;
+	transform: translate3d(0, 100%, 0);
+	padding: 30px;
+	box-sizing: border-box;
+	box-shadow: 0 0 4px 4px rgba(0, 0, 0, 0.3);
+}
+.map-bottom-body {
+	width: 100%;
+	margin-bottom: 15px;
+	background-color: #0288d1;
+	border-radius: 3px;
+	padding: 10px;
+	box-sizing: border-box;
+	font-size: larger;
+	color: white;
+}
+.map-bottom-nopick {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	text-align: center;
+	background-color: white;
+	color: black;
+	font-size: xx-large;
+}
+.map-bottom-odp {
+	text-align: center;
+}
+
+.gm-style-cc {
+	display: none !important;
+}
+.gm-style a[href^="https://maps.google.com/maps"]
+{
+	display: none !important;
+}

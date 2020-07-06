@@ -1,13 +1,16 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, TouchEvent } from "react";
 import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
-import "../styles/Map.css";
+import "../styles/MapsMobile.css";
+// Images
+import pin_marker from "../images/marker.png";
 import pin_red from "../images/pin_red.png";
 import pin_yellow from "../images/pin_yellow.png";
 import pin_green from "../images/pin_green.png";
 import pin_black from "../images/pin_black.png";
 import my_location from "../images/my_location.png";
+// -----
 const AxiosLocation = AxiosCancelRequest(axios);
 const AxiosDirection = AxiosCancelRequest(axios);
 const center = {
@@ -26,24 +29,22 @@ function titleCase(str: String) {
 }
 
 const MapComponent = () => {
-	const mapRef = useRef();
-	const inputRef = useRef();
-	const bottomRef = useRef();
-	const radiusRef = useRef();
-	const zoomInRef = useRef();
-	const zoomOutRef = useRef();
+	const mapRef = useRef<HTMLDivElement>();
+	const inputRef = useRef<HTMLInputElement>();
+	const bottomRef = useRef<HTMLDivElement>();
+	const radiusRef = useRef<HTMLInputElement>();
 	const [data, setData] = useState("");
 	const [status, setStatus] = useState("No location selected.");
 	const [loading, setLoading] = useState(true);
 	const [odpStatus, setOdpStatus] = useState("");
-	const [touchStart, setTouchStart] = useState();
-	const [inputRadius, setInputRadius] = useState(200);
+	const [touchStart, setTouchStart] = useState(0);
+	const [inputRadius, setInputRadius] = useState("200");
+	const [radiusShow, setRadiusShow] = useState(false);
 	const [bottomShow, setBottomShow] = useState(false);
 
 	// Initialize an variables to call it later
 	let googleMap;
 	let marker;
-	let infoWindow;
 	let circle;
 	let polygon;
 	let autoComplete;
@@ -54,7 +55,7 @@ const MapComponent = () => {
 	useEffect(() => {
 		// Create script element and call google maps api
 		const googleScript = document.createElement("script");
-		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_APIX}&libraries=places,geometry`;
+		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places,geometry`;
 		window.document.body.appendChild(googleScript);
 
 		googleScript.addEventListener("load", async () => {
@@ -73,13 +74,17 @@ const MapComponent = () => {
 			// Marker initialize
 			marker = new window.google.maps.Marker({
 				map: googleMap,
-				draggable: true,
 				visible: false,
+				icon: {
+					url: pin_marker,
+					size: new window.google.maps.Size(42, 50),
+					origin: new window.google.maps.Point(0, 0),
+					anchor: new window.google.maps.Point(21, 47),
+				},
 			});
 
 			// AutoComplete initialize, cannot use useRef to get element
-			const inputElement = document.getElementById("map-search-mobile");
-			autoComplete = new window.google.maps.places.Autocomplete(inputElement, {
+			autoComplete = new window.google.maps.places.Autocomplete(inputRef.current, {
 				fields: ["geometry", "name"],
 				types: ["geocode"],
 				componentRestrictions: { country: ["id"] },
@@ -93,7 +98,8 @@ const MapComponent = () => {
 				strokeOpacity: 0,
 				strokeWeight: 0,
 				fillColor: "#FF0000",
-				fillOpacity: 0.25,
+				fillOpacity: 0.2,
+				clickable: false,
 			});
 
 			// Polygon initialize
@@ -127,7 +133,7 @@ const MapComponent = () => {
 		circle.setMap(null);
 		circle.setMap(googleMap);
 		circle.setCenter({ lat, lng });
-		circle.setRadius(200);
+		circle.setRadius(parseFloat(radiusRef.current.value));
 
 		setLoading(true);
 		setStatus("Fetching data...");
@@ -151,6 +157,10 @@ const MapComponent = () => {
 				setLoading(false);
 				setData(name);
 				setOdpStatus("Fetching ODP data...");
+
+				bottomRef.current.style.transition = ".3s";
+				bottomRef.current.style.bottom = "200px";
+				setBottomShow(true);
 				getDirection(lat, lng);
 			})
 			.catch((reject) => {
@@ -162,15 +172,22 @@ const MapComponent = () => {
 	};
 
 	const getDirection = (lat: number, lng: number): void => {
-		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: 200 }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
+		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
 				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
 				setOdpStatus(`${odpData.length} ODP found`);
 				odpMarker = [];
 				googleMap.setCenter({ lat: lat, lng: lng });
-				if (odpData.length) googleMap.setZoom(17);
+				if (odpData.length) {
+					if (parseFloat(radiusRef.current.value) <= 150) {
+						googleMap.setZoom(18);
+					} else if (parseFloat(radiusRef.current.value) >= 250) {
+						googleMap.setZoom(16);
+					} else {
+						googleMap.setZoom(17);
+					}
+				}
 				if (bottomRef.current.dataset.show === "true") googleMap.panBy(0, 70);
-				console.log(bottomRef.current.dataset);
 
 				odpData.forEach((x, i) => {
 					const data = x.attributes;
@@ -195,9 +212,9 @@ const MapComponent = () => {
 							position: { lat: data.lat, lng: data.long },
 							icon: {
 								url: pin,
-								size: new window.google.maps.Size(32, 32),
+								size: new window.google.maps.Size(38, 45),
 								origin: new window.google.maps.Point(0, 0),
-								anchor: new window.google.maps.Point(16, 32),
+								anchor: new window.google.maps.Point(19, 42),
 							},
 						}),
 					);
@@ -277,25 +294,12 @@ const MapComponent = () => {
 			getLocation(location.lat(), location.lng());
 		});
 
-		window.google.maps.event.addDomListener(zoomInRef.current, "click", () => {
-			googleMap.setZoom(googleMap.getZoom() + 1);
-		});
-
-		window.google.maps.event.addDomListener(zoomOutRef.current, "click", () => {
-			googleMap.setZoom(googleMap.getZoom() - 1);
-		});
+		// window.google.maps.event.addDomListener(zoomInRef.current, "click", () => {
+		// 	googleMap.setZoom(googleMap.getZoom() + 1);
+		// });
 
 		marker.addListener("click", (): void => {
 			console.log(bottomShow);
-		});
-
-		marker.addListener("dragend", (): void => {
-			const location = marker.getPosition();
-
-			setStatus("Fetching data...");
-
-			polygon.setMap(null);
-			getLocation(location.lat(), location.lng());
 		});
 
 		googleMap.addListener("click", (e: any): void => {
@@ -372,21 +376,42 @@ const MapComponent = () => {
 	return (
 		<div className="map-page" style={{ height: window.innerHeight }}>
 			<div className="map-container" ref={mapRef} />
-			<div className="map-find-me" onClick={() => {}}>
-				<img src={my_location} alt="find_me" />
-			</div>
 			<div className="map-top">
-				<input placeholder="Search here..." className="map-top-search" />
-				<img
-					src={my_location}
-					alt="find-me"
-					className="map-top-findme"
-					onClick={() => {
-						console.log(bottomShow);
-					}}
-				/>
+				<input placeholder="Search here..." className="map-top-search" ref={inputRef} />
+				<img src={my_location} alt="find-me" className="map-top-findme" onClick={findMe} />
 			</div>
-			<div className="map-radius-icon" />
+			<div
+				className="map-radius-icon"
+				onClick={() => {
+					setRadiusShow(true);
+				}}
+			/>
+			{radiusShow ? (
+				<>
+					<div
+						className="map-radius-bg"
+						onClick={() => {
+							setRadiusShow(false);
+						}}
+					/>
+					<div className="map-radius-con">
+						<span>Radius: {inputRadius}</span>
+						<input
+							type="range"
+							min="100"
+							max="300"
+							step="25"
+							value={inputRadius}
+							onChange={(e) => {
+								setInputRadius(e.target.value);
+							}}
+						/>
+					</div>
+				</>
+			) : (
+				<></>
+			)}
+			<input type="number" ref={radiusRef} value={inputRadius} readOnly style={{ display: "none" }} />
 			<div
 				className="map-bottom"
 				ref={bottomRef}
@@ -396,16 +421,12 @@ const MapComponent = () => {
 				}}
 				onTouchMove={touchMoveHandler}
 				onTouchEnd={touchEndHandler}>
-				<div className="map-zoom">
-					<img alt="plus" ref={zoomInRef} />
-					<img alt="minus" ref={zoomOutRef} />
-				</div>
 				{loading ? (
 					<div className="map-bottom-nopick">{status}</div>
 				) : (
 					<>
-						<div className="map-bottom-data">{data}</div>
-						<div className="map-bottom-odp">{odpStatus}</div>
+						<div className="map-bottom-data map-bottom-body">{data}</div>
+						<div className="map-bottom-odp map-bottom-body">{odpStatus}</div>
 					</>
 				)}
 			</div>

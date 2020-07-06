@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
-import "../styles/Map.css";
+import "../styles/MapsDesktop.css";
 import pin_red from "../images/pin_red.png";
 import pin_yellow from "../images/pin_yellow.png";
 import pin_green from "../images/pin_green.png";
@@ -16,13 +16,13 @@ const center = {
 };
 
 const MapComponent = () => {
-	const mapRef = useRef();
-	const inputRef = useRef();
-	const inputLatLng = useRef();
-	const radiusRef = useRef();
+	const mapRef = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
+	const inputLatLng = useRef<HTMLFormElement>(null);
+	const radiusRef = useRef<HTMLInputElement>(null);
 	const [inputLat, setInputLat] = useState("");
 	const [inputLng, setInputLng] = useState("");
-	const [inputRadius, setInputRadius] = useState(200);
+	const [inputRadius, setInputRadius] = useState("200");
 	const [searchName, setSearchName] = useState(true);
 
 	// Initialize an variables to call it later
@@ -38,7 +38,7 @@ const MapComponent = () => {
 	useEffect(() => {
 		// Create script element and call google maps api
 		const googleScript = document.createElement("script");
-		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_APIX}&libraries=places,geometry`;
+		googleScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_API}&libraries=places,geometry`;
 		window.document.body.appendChild(googleScript);
 
 		googleScript.addEventListener("load", async () => {

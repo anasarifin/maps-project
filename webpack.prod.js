@@ -15,8 +15,9 @@ module.exports = () => {
 		devtool: "source-map",
 		entry: path.resolve(__dirname, "src", "index.js"),
 		output: {
+			filename: "[name].bundle.js",
+			chunkFilename: "[name].bundle.js",
 			path: path.resolve(__dirname, "build"),
-			filename: "bundle.js",
 			publicPath: "/",
 		},
 		resolve: {
