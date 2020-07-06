@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
 import "../styles/MapsDesktop.css";
+import pin_marker from "../images/marker.png";
 import pin_red from "../images/pin_red.png";
 import pin_yellow from "../images/pin_yellow.png";
 import pin_green from "../images/pin_green.png";
@@ -60,6 +61,12 @@ const MapComponent = () => {
 				map: googleMap,
 				draggable: true,
 				visible: false,
+				icon: {
+					url: pin_marker,
+					size: new window.google.maps.Size(42, 50),
+					origin: new window.google.maps.Point(0, 0),
+					anchor: new window.google.maps.Point(21, 47),
+				},
 			});
 
 			// InfoWindow initialize
@@ -195,9 +202,9 @@ const MapComponent = () => {
 							position: { lat: data.lat, lng: data.long },
 							icon: {
 								url: pin,
-								size: new window.google.maps.Size(32, 32),
+								size: new window.google.maps.Size(38, 45),
 								origin: new window.google.maps.Point(0, 0),
-								anchor: new window.google.maps.Point(16, 32),
+								anchor: new window.google.maps.Point(19, 42),
 							},
 						}),
 					);
