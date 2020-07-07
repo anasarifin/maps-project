@@ -3,14 +3,7 @@ import React, { useState, useRef, useEffect, TouchEvent } from "react";
 import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
 import "../styles/MapsMobile.css";
-// Images
-import pin_marker from "../images/marker.png";
-import pin_red from "../images/pin_red.png";
-import pin_yellow from "../images/pin_yellow.png";
-import pin_green from "../images/pin_green.png";
-import pin_black from "../images/pin_black.png";
 import my_location from "../images/my_location.png";
-// -----
 const AxiosLocation = AxiosCancelRequest(axios);
 const AxiosDirection = AxiosCancelRequest(axios);
 const center = {
@@ -75,12 +68,12 @@ const MapComponent = () => {
 			marker = new window.google.maps.Marker({
 				map: googleMap,
 				visible: false,
-				icon: {
-					url: pin_marker,
-					size: new window.google.maps.Size(42, 50),
-					origin: new window.google.maps.Point(0, 0),
-					anchor: new window.google.maps.Point(21, 47),
-				},
+				// icon: {
+				// 	url: pin_marker,
+				// 	size: new window.google.maps.Size(42, 50),
+				// 	origin: new window.google.maps.Point(0, 0),
+				// 	anchor: new window.google.maps.Point(21, 47),
+				// },
 			});
 
 			// AutoComplete initialize, cannot use useRef to get element
@@ -175,7 +168,13 @@ const MapComponent = () => {
 		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
 				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
-				setOdpStatus(`${odpData.length} ODP found`);
+				let odpPercent = 0;
+				if (odpData.length) {
+					const devicePort = odpData.map((x) => x.attributes.deviceportnumber).reduce((acc, x) => acc + x);
+					const idlePort = odpData.map((x) => x.attributes.portidlenumber).reduce((acc, x) => acc + x);
+					odpPercent = parseFloat(((idlePort / devicePort) * 100).toFixed(1));
+				}
+				setOdpStatus(`${odpData.length} ODP found (${odpPercent}%)`);
 				odpMarker = [];
 				googleMap.setCenter({ lat: lat, lng: lng });
 				if (odpData.length) {
@@ -191,19 +190,19 @@ const MapComponent = () => {
 
 				odpData.forEach((x, i) => {
 					const data = x.attributes;
-					let pin: string;
+					let color: string;
 					switch (data.status_occ_add) {
 						case "RED":
-							pin = pin_red;
+							color = "red";
 							break;
 						case "YELLOW":
-							pin = pin_yellow;
+							color = "yellow";
 							break;
 						case "GREEN":
-							pin = pin_green;
+							color = "green";
 							break;
 						default:
-							pin = pin_black;
+							color = "black";
 					}
 
 					odpMarker.push(
@@ -211,10 +210,11 @@ const MapComponent = () => {
 							map: googleMap,
 							position: { lat: data.lat, lng: data.long },
 							icon: {
-								url: pin,
-								size: new window.google.maps.Size(38, 45),
-								origin: new window.google.maps.Point(0, 0),
-								anchor: new window.google.maps.Point(19, 42),
+								path: window.google.maps.SymbolPath.CIRCLE,
+								scale: 6,
+								fillColor: color,
+								fillOpacity: 0.9,
+								strokeWeight: 0,
 							},
 						}),
 					);

@@ -7,7 +7,7 @@ const App = () => {
 	// return <div className="App">{isMobile ? <MapsMobile /> : <MapsDesktop />}</div>;
 	return (
 		<div>
-			<Suspense fallback={<div>Loading...</div>}>{isMobile ? <MapsMobile /> : <MapsDesktop />}</Suspense>
+			<Suspense fallback={<div></div>}>{isMobile ? <MapsMobile /> : <MapsDesktop />}</Suspense>
 		</div>
 	);
 };
