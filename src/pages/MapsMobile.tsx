@@ -11,7 +11,7 @@ const center = {
 	lng: 106.8456,
 };
 
-function titleCase(str: String) {
+function titleCase(str: string): string {
 	return str
 		.toLowerCase()
 		.split(" ")
@@ -68,12 +68,6 @@ const MapComponent = () => {
 			marker = new window.google.maps.Marker({
 				map: googleMap,
 				visible: false,
-				// icon: {
-				// 	url: pin_marker,
-				// 	size: new window.google.maps.Size(42, 50),
-				// 	origin: new window.google.maps.Point(0, 0),
-				// 	anchor: new window.google.maps.Point(21, 47),
-				// },
 			});
 
 			// AutoComplete initialize, cannot use useRef to get element
@@ -117,10 +111,14 @@ const MapComponent = () => {
 		});
 	}, []);
 
-	const getLocation = (lat: number, lng: number, show?: boolean) => {
+	const getLocation = (lat: number, lng: number) => {
 		odpMarker.map((x) => x.setMap(null));
 		if (directionsRenderer) directionsRenderer.setMap(null);
 
+		marker.setPosition({ lat, lng });
+		marker.setVisible(true);
+
+		polygon.setMap(null);
 		googleMap.panTo({ lat, lng });
 
 		circle.setMap(null);
@@ -167,11 +165,11 @@ const MapComponent = () => {
 	const getDirection = (lat: number, lng: number): void => {
 		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
-				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
+				const odpData = resolve.data.data.features.filter((x: ODP) => x.attributes.portidlenumber > 0);
 				let odpPercent = 0;
 				if (odpData.length) {
-					const devicePort = odpData.map((x) => x.attributes.deviceportnumber).reduce((acc, x) => acc + x);
-					const idlePort = odpData.map((x) => x.attributes.portidlenumber).reduce((acc, x) => acc + x);
+					const devicePort = odpData.map((x: ODP) => x.attributes.deviceportnumber).reduce((acc: number, x: number) => acc + x);
+					const idlePort = odpData.map((x: ODP) => x.attributes.portidlenumber).reduce((acc: number, x: number) => acc + x);
 					odpPercent = parseFloat(((idlePort / devicePort) * 100).toFixed(1));
 				}
 				setOdpStatus(`${odpData.length} ODP found (${odpPercent}%)`);
@@ -188,7 +186,7 @@ const MapComponent = () => {
 				}
 				if (bottomRef.current.dataset.show === "true") googleMap.panBy(0, 70);
 
-				odpData.forEach((x, i) => {
+				odpData.forEach((x: ODP, i: number) => {
 					const data = x.attributes;
 					let color: string;
 					switch (data.status_occ_add) {
@@ -285,32 +283,11 @@ const MapComponent = () => {
 				googleMap.setZoom(16);
 			}
 
-			marker.setPosition(location);
-			marker.setVisible(true);
-
-			setStatus("Fetching data...");
-
-			polygon.setMap(null);
 			getLocation(location.lat(), location.lng());
-		});
-
-		// window.google.maps.event.addDomListener(zoomInRef.current, "click", () => {
-		// 	googleMap.setZoom(googleMap.getZoom() + 1);
-		// });
-
-		marker.addListener("click", (): void => {
-			console.log(bottomShow);
 		});
 
 		googleMap.addListener("click", (e: any): void => {
 			if (inputRef.current) inputRef.current.value = "";
-
-			marker.setPosition(e.latLng);
-			marker.setVisible(true);
-
-			setStatus("Fetching data...");
-
-			polygon.setMap(null);
 			getLocation(e.latLng.lat(), e.latLng.lng());
 		});
 	};
@@ -325,14 +302,8 @@ const MapComponent = () => {
 						lng: coords.longitude,
 					};
 
-					marker.setPosition(position);
-					marker.setVisible(true);
-
-					polygon.setMap(null);
-
 					googleMap.setCenter(position);
 					googleMap.setZoom(17);
-
 					getLocation(coords.latitude, coords.longitude);
 				},
 				() => {
@@ -351,8 +322,6 @@ const MapComponent = () => {
 		if (bottomShow) {
 			touchStartEdge = 200 - (window.innerHeight - touchStart);
 			value = 200 - (touchPos - (window.innerHeight - 200) - touchStartEdge);
-
-			window;
 		}
 
 		if (value > 200) value = 200;
@@ -438,6 +407,19 @@ declare global {
 	interface Window {
 		google: any;
 	}
+}
+
+interface Attributes {
+	device_id: number;
+	devicename: string;
+	lat: number;
+	long: number;
+	status_occ_add: string;
+	portidlenumber: number;
+	deviceportnumber: number;
+}
+interface ODP {
+	attributes: Attributes;
 }
 
 export default MapComponent;
