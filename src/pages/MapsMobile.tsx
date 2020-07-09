@@ -35,6 +35,9 @@ const MapComponent = () => {
 	const [radiusShow, setRadiusShow] = useState(false);
 	const [bottomShow, setBottomShow] = useState(false);
 
+	// 0: No menu, 1: Menu hide, 2: Menu show
+	const [nearest, setNearest] = useState(0);
+
 	// Initialize an variables to call it later
 	let googleMap;
 	let marker;
@@ -44,6 +47,7 @@ const MapComponent = () => {
 	let odpMarker = [];
 	let directionsService;
 	let directionsRenderer;
+	let distanceMatrix;
 
 	useEffect(() => {
 		// Create script element and call google maps api
@@ -106,6 +110,9 @@ const MapComponent = () => {
 				suppressMarkers: true,
 				preserveViewport: true,
 			});
+
+			// Distance Matrix initialize
+			distanceMatrix = new window.google.maps.DistanceMatrixService();
 
 			mapEventListener();
 		});
@@ -217,6 +224,10 @@ const MapComponent = () => {
 						}),
 					);
 
+					odpMarker[i].latlng = { lat: data.lat, lng: data.long };
+					odpMarker[i].index = i;
+					odpMarker[i].distance = window.google.maps.geometry.spherical.computeDistanceBetween(marker.getPosition(), odpMarker[i].getPosition());
+
 					odpMarker[i].infoWindow = new window.google.maps.InfoWindow({
 						content: `<div>
 						<span>Latitude: ${data.lat}</span><br/>
@@ -230,8 +241,12 @@ const MapComponent = () => {
 					});
 
 					odpMarker[i].addListener("mouseover", () => {
-						odpMarker.map((x) => x.infoWindow.close());
+						odpMarker.map((x) => {
+							x.infoWindow.close();
+							x.infoDistance?.close();
+						});
 						odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
+						setNearest(1);
 					});
 
 					odpMarker[i].addListener("mouseout", () => {
@@ -239,7 +254,12 @@ const MapComponent = () => {
 					});
 
 					odpMarker[i].addListener("click", () => {
-						odpMarker.map((x) => x.infoWindow.close());
+						odpMarker.map((x) => {
+							x.infoWindow.close();
+							x.infoDistance?.close();
+						});
+						setNearest(1);
+
 						odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
 						directionsService.route(
 							{
@@ -258,6 +278,14 @@ const MapComponent = () => {
 						);
 					});
 				});
+
+				const dataDistance = odpMarker
+					.map((x) => {
+						return { distance: x.distance, index: x.index, latlng: x.latlng };
+					})
+					.sort((a, b) => a.distance - b.distance)
+					.filter((x, i) => i < 3);
+				getDistance(dataDistance);
 			})
 			.catch((reject) => {
 				if (!axios.isCancel(reject)) {
@@ -265,6 +293,31 @@ const MapComponent = () => {
 					setOdpStatus("Fetching ODP failed!");
 				}
 			});
+	};
+
+	const getDistance = (data) => {
+		distanceMatrix.getDistanceMatrix(
+			{
+				origins: [marker.getPosition()],
+				destinations: data.map((x) => new window.google.maps.LatLng(x.latlng.lat, x.latlng.lng)),
+				travelMode: "WALKING",
+			},
+			(response, status) => {
+				if (status === "OK") {
+					setNearest(2);
+					data.forEach((x, i) => {
+						odpMarker[data[i].index].infoDistance = new window.google.maps.InfoWindow({
+							content: `<div>
+							<span>${response.rows[0].elements[i].distance.value} m</span>
+						</div>`,
+						});
+						odpMarker[data[i].index].infoDistance.open(googleMap, odpMarker[data[i].index]);
+					});
+				} else {
+					window.alert("Distances request failed due to " + status);
+				}
+			},
+		);
 	};
 
 	const mapEventListener = (): void => {
@@ -284,6 +337,22 @@ const MapComponent = () => {
 			}
 
 			getLocation(location.lat(), location.lng());
+		});
+
+		const element = document.getElementsByClassName("map-nearest")[0] as HTMLElement;
+		window.google.maps.event.addDomListener(element, "click", () => {
+			if (element.dataset.nearest === "1") {
+				odpMarker.map((x, i) => {
+					x.infoDistance?.open(googleMap, odpMarker[i]);
+					x.infoWindow.setMap(null);
+				});
+				setNearest(2);
+			} else {
+				odpMarker.map((x) => {
+					x.infoDistance?.close();
+				});
+				setNearest(1);
+			}
 		});
 
 		googleMap.addListener("click", (e: any): void => {
@@ -390,6 +459,9 @@ const MapComponent = () => {
 				}}
 				onTouchMove={touchMoveHandler}
 				onTouchEnd={touchEndHandler}>
+				<div className="map-nearest" data-nearest={nearest} style={{ display: nearest ? "block" : "none" }}>
+					{nearest === 1 ? "Show nearest" : "Hide nearest"}
+				</div>
 				{loading ? (
 					<div className="map-bottom-nopick">{status}</div>
 				) : (

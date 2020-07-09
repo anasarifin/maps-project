@@ -31,6 +31,7 @@ const MapComponent = () => {
 	let odpMarker = [];
 	let directionsService;
 	let directionsRenderer;
+	let distanceMatrix;
 
 	useEffect(() => {
 		// Create script element and call google maps api
@@ -105,6 +106,9 @@ const MapComponent = () => {
 				suppressMarkers: true,
 				preserveViewport: true,
 			});
+
+			// Distance Matrix initialize
+			distanceMatrix = new window.google.maps.DistanceMatrixService();
 
 			const searchBar = document.getElementsByClassName("map-search-bar")[0];
 			const findMeIcon = document.getElementsByClassName("map-find-me")[0];
@@ -187,7 +191,6 @@ const MapComponent = () => {
 	};
 
 	const getDirection = (lat: number, lng: number): void => {
-		console.log(radiusRef.current.value);
 		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
 				const odpData = resolve.data.data.features.filter((x: ODP) => x.attributes.portidlenumber > 0);
@@ -234,6 +237,10 @@ const MapComponent = () => {
 						}),
 					);
 
+					odpMarker[i].latlng = { lat: data.lat, lng: data.long };
+					odpMarker[i].index = i;
+					odpMarker[i].distance = window.google.maps.geometry.spherical.computeDistanceBetween(marker.getPosition(), odpMarker[i].getPosition());
+
 					odpMarker[i].infoWindow = new window.google.maps.InfoWindow({
 						content: `<div>
 						<span>Latitude: ${data.lat}</span><br/>
@@ -277,6 +284,14 @@ const MapComponent = () => {
 						);
 					});
 				});
+
+				const dataDistance = odpMarker
+					.map((x) => {
+						return { distance: x.distance, index: x.index, latlng: x.latlng };
+					})
+					.sort((a, b) => a.distance - b.distance)
+					.filter((x, i) => i < 3);
+				getDistance(dataDistance);
 			})
 			.catch((reject) => {
 				if (!axios.isCancel(reject)) {
@@ -285,6 +300,30 @@ const MapComponent = () => {
 					loading.innerHTML = `Fetching ODP failed!`;
 				}
 			});
+	};
+
+	const getDistance = (data) => {
+		distanceMatrix.getDistanceMatrix(
+			{
+				origins: [marker.getPosition()],
+				destinations: data.map((x) => new window.google.maps.LatLng(x.latlng.lat, x.latlng.lng)),
+				travelMode: "WALKING",
+			},
+			(response, status) => {
+				if (status === "OK") {
+					data.forEach((x, i) => {
+						odpMarker[data[i].index].infoDistance = new window.google.maps.InfoWindow({
+							content: `<div>
+							<span>${response.rows[0].elements[i].distance.value} m</span>
+						</div>`,
+						});
+						odpMarker[data[i].index].infoDistance.open(googleMap, odpMarker[data[i].index]);
+					});
+				} else {
+					window.alert("Distances request failed due to " + status);
+				}
+			},
+		);
 	};
 
 	const mapEventListener = (): void => {

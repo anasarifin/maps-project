@@ -114,6 +114,15 @@ img:press {
 .map-bottom-odp {
 	text-align: center;
 }
+.map-nearest {
+	position: absolute;
+	top: -52px;
+	left: 8px;
+	background-color: white;
+	border-radius: 4px;
+	padding: 10px;
+	box-shadow: 0 2px 4px 2px rgba(0, 0, 0, 0.4);
+}
 
 .gm-style-cc {
 	display: none !important;
