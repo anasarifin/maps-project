@@ -25,11 +25,13 @@ const MapComponent = () => {
 	let googleMap;
 	let marker;
 	let infoWindow;
+	let circle;
 	let polygon;
 	let autoComplete;
 	let odpMarker = [];
 	let directionsService;
 	let directionsRenderer;
+	let distanceMatrix;
 
 	useEffect(() => {
 		// Create script element and call google maps api
@@ -51,17 +53,16 @@ const MapComponent = () => {
 				},
 			});
 
+			// --- NOTE ---
+			// You can't use React State inside window.google class,
+			// so use traditional dom or React useRef
+			// ------------
+
 			// Marker initialize
 			marker = new window.google.maps.Marker({
 				map: googleMap,
 				draggable: true,
 				visible: false,
-				// icon: {
-				// 	url: pin_marker,
-				// 	size: new window.google.maps.Size(42, 50),
-				// 	origin: new window.google.maps.Point(0, 0),
-				// 	anchor: new window.google.maps.Point(21, 47),
-				// },
 			});
 
 			// InfoWindow initialize
@@ -75,6 +76,17 @@ const MapComponent = () => {
 				componentRestrictions: { country: ["id"] },
 			});
 			autoComplete.bindTo("bounds", googleMap);
+
+			// Radius circle initialize
+			circle = new window.google.maps.Circle({
+				map: googleMap,
+				strokeColor: "#FF0000",
+				strokeOpacity: 0,
+				strokeWeight: 0,
+				fillColor: "#FF0000",
+				fillOpacity: 0.2,
+				clickable: false,
+			});
 
 			// Polygon initialize
 			polygon = new window.google.maps.Polygon({
@@ -95,6 +107,9 @@ const MapComponent = () => {
 				preserveViewport: true,
 			});
 
+			// Distance Matrix initialize
+			distanceMatrix = new window.google.maps.DistanceMatrixService();
+
 			const searchBar = document.getElementsByClassName("map-search-bar")[0];
 			const findMeIcon = document.getElementsByClassName("map-find-me")[0];
 			const radiusSlider = document.getElementsByClassName("map-radius-slider")[0];
@@ -109,6 +124,18 @@ const MapComponent = () => {
 	const getLocation = (lat: number, lng: number) => {
 		odpMarker.map((x) => x.setMap(null));
 		if (directionsRenderer) directionsRenderer.setMap(null);
+
+		marker.setPosition({ lat, lng });
+		marker.setVisible(true);
+
+		infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
+		infoWindow.open(googleMap, marker);
+
+		polygon.setMap(null);
+		circle.setMap(null);
+		circle.setMap(googleMap);
+		circle.setCenter({ lat, lng });
+		circle.setRadius(parseFloat(radiusRef.current.value));
 
 		AxiosLocation({ url: `https://siis-api.udata.id/point_kelurahan/${lng},${lat}` })
 			.then((resolve) => {
@@ -164,14 +191,13 @@ const MapComponent = () => {
 	};
 
 	const getDirection = (lat: number, lng: number): void => {
-		console.log(radiusRef.current.value);
 		AxiosDirection({ url: "http://digitasi-consumer-siis-dev.vsan-apps.playcourt.id/api/siis/v1/get-odp", method: "post", data: { lat: lat, long: lng, radius: radiusRef.current.value }, auth: { username: "telkom", password: process.env.ODP_PASSWORD } })
 			.then((resolve) => {
-				const odpData = resolve.data.data.features.filter((x) => x.attributes.portidlenumber > 0);
+				const odpData = resolve.data.data.features.filter((x: ODP) => x.attributes.portidlenumber > 0);
 				let odpPercent = 0;
 				if (odpData.length) {
-					const devicePort = odpData.map((x) => x.attributes.deviceportnumber).reduce((acc, x) => acc + x);
-					const idlePort = odpData.map((x) => x.attributes.portidlenumber).reduce((acc, x) => acc + x);
+					const devicePort = odpData.map((x: ODP) => x.attributes.deviceportnumber).reduce((acc: number, x: number) => acc + x);
+					const idlePort = odpData.map((x: ODP) => x.attributes.portidlenumber).reduce((acc: number, x: number) => acc + x);
 					odpPercent = parseFloat(((idlePort / devicePort) * 100).toFixed(1));
 				}
 				const loading = document.getElementById("map-popup-odp-loading");
@@ -180,7 +206,7 @@ const MapComponent = () => {
 				googleMap.setCenter({ lat: lat, lng: lng });
 				if (odpData.length) googleMap.setZoom(17);
 
-				odpData.forEach((x, i) => {
+				odpData.forEach((x: ODP, i: number) => {
 					const data = x.attributes;
 					let color: string;
 					switch (data.status_occ_add) {
@@ -210,6 +236,10 @@ const MapComponent = () => {
 							},
 						}),
 					);
+
+					odpMarker[i].latlng = { lat: data.lat, lng: data.long };
+					odpMarker[i].index = i;
+					odpMarker[i].distance = window.google.maps.geometry.spherical.computeDistanceBetween(marker.getPosition(), odpMarker[i].getPosition());
 
 					odpMarker[i].infoWindow = new window.google.maps.InfoWindow({
 						content: `<div>
@@ -254,6 +284,14 @@ const MapComponent = () => {
 						);
 					});
 				});
+
+				const dataDistance = odpMarker
+					.map((x) => {
+						return { distance: x.distance, index: x.index, latlng: x.latlng };
+					})
+					.sort((a, b) => a.distance - b.distance)
+					.filter((x, i) => i < 3);
+				getDistance(dataDistance);
 			})
 			.catch((reject) => {
 				if (!axios.isCancel(reject)) {
@@ -262,6 +300,30 @@ const MapComponent = () => {
 					loading.innerHTML = `Fetching ODP failed!`;
 				}
 			});
+	};
+
+	const getDistance = (data) => {
+		distanceMatrix.getDistanceMatrix(
+			{
+				origins: [marker.getPosition()],
+				destinations: data.map((x) => new window.google.maps.LatLng(x.latlng.lat, x.latlng.lng)),
+				travelMode: "WALKING",
+			},
+			(response, status) => {
+				if (status === "OK") {
+					data.forEach((x, i) => {
+						odpMarker[data[i].index].infoDistance = new window.google.maps.InfoWindow({
+							content: `<div>
+							<span>${response.rows[0].elements[i].distance.value} m</span>
+						</div>`,
+						});
+						odpMarker[data[i].index].infoDistance.open(googleMap, odpMarker[data[i].index]);
+					});
+				} else {
+					window.alert("Distances request failed due to " + status);
+				}
+			},
+		);
 	};
 
 	const mapEventListener = (): void => {
@@ -280,13 +342,6 @@ const MapComponent = () => {
 				googleMap.setZoom(16);
 			}
 
-			marker.setPosition(location);
-			marker.setVisible(true);
-
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
-
-			polygon.setMap(null);
 			getLocation(location.lat(), location.lng());
 		});
 
@@ -317,33 +372,17 @@ const MapComponent = () => {
 
 		googleMap.addListener("click", (e: any): void => {
 			if (inputRef.current) inputRef.current.value = "";
-
-			marker.setPosition(e.latLng);
-			marker.setVisible(true);
-
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
-
-			polygon.setMap(null);
 			getLocation(e.latLng.lat(), e.latLng.lng());
 		});
 
 		inputLatLng.current.addEventListener("submit", (e: Event): void => {
 			e.preventDefault();
 
-			// Cannot use React state, must using traditional way to get value
 			const element = inputLatLng.current.querySelectorAll("input");
 			const location = {
 				lat: parseFloat(element[0].value) || 0,
 				lng: parseFloat(element[1].value) || 0,
 			};
-
-			marker.setPosition(location);
-			marker.setVisible(true);
-			googleMap.panTo(location);
-
-			infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-			infoWindow.open(googleMap, marker);
 
 			getLocation(location.lat, location.lng);
 		});
@@ -359,16 +398,8 @@ const MapComponent = () => {
 						lng: coords.longitude,
 					};
 
-					marker.setPosition(position);
-					marker.setVisible(true);
-
-					infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-					infoWindow.open(googleMap, marker);
-					polygon.setMap(null);
-
 					googleMap.setCenter(position);
 					googleMap.setZoom(17);
-
 					getLocation(coords.latitude, coords.longitude);
 				},
 				() => {
@@ -439,6 +470,19 @@ declare global {
 	interface Window {
 		google: any;
 	}
+}
+
+interface Attributes {
+	device_id: number;
+	devicename: string;
+	lat: number;
+	long: number;
+	status_occ_add: string;
+	portidlenumber: number;
+	deviceportnumber: number;
+}
+interface ODP {
+	attributes: Attributes;
 }
 
 export default MapComponent;
