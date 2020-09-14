@@ -4,10 +4,15 @@ import axios from "axios";
 import AxiosCancelRequest from "axios-cancel-request";
 const AxiosLocation = AxiosCancelRequest(axios);
 const AxiosDirection = AxiosCancelRequest(axios);
-import "../styles/MapsDesktop.css";
+const AxiosStreet = AxiosCancelRequest(axios);
+import ReactTooltip from "react-tooltip";
+import "../styles/MapsDesktop.scss";
 import Menu from "../components/Menu";
 import Info from "../components/Info";
+import Editor from "../components/Editor";
 import Button from "../components/Button";
+import Underspec from "../components/Underspec";
+import StreetList from "../components/StreetList";
 
 const center = {
     lat: -6.2088,
@@ -18,7 +23,7 @@ const titleCase = (str: string) => {
         .toLowerCase()
         .split(" ")
         .map((word) => {
-            return word.replace(word[0], word[0].toUpperCase());
+            return word.replace(word[0], word[0]?.toUpperCase());
         })
         .join(" ");
 };
@@ -64,15 +69,13 @@ const odpFormat = (odpList, source: number) => {
             return odpList.map((x) => {
                 return {
                     id: x.odp_eid,
-                    name: x.odp_name,
+                    name: x.odp_name.toUpperCase(),
                     latitude: parseFloat(x.latitude),
                     longitude: parseFloat(x.longitude),
                     status: x.status_occ_add,
                     idle_port: parseFloat(x.portidlenumber),
                     device_port: x.deviceportnumber,
-                    underspec_detail: x.underspec_detail.filter((y) => {
-                        return y.hasil_ukur.inet != null;
-                    }),
+                    underspec_detail: x.underspec_detail.filter((y) => y.hasil_ukur.inet != null).map((z) => z.hasil_ukur),
                 };
             });
         default:
@@ -83,14 +86,20 @@ const odpFormat = (odpList, source: number) => {
 const MapComponent = () => {
     const mapRef = useRef<HTMLDivElement>(null);
     const infoRef = useRef<HTMLDivElement>(null);
+    const streetRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const radiusRef = useRef<HTMLInputElement>(null);
+    const sourceRef = useRef<HTMLInputElement>(null);
     const [locationName, setLocationName] = useState("");
-    const [status, setStatus] = useState("Pick a location first.");
+    const [status, setStatus] = useState("");
     const [odpStatus, setOdpStatus] = useState("");
+    const [streetList, setStreetList] = useState([]);
+    const [streetStatus, setStreetStatus] = useState("");
+    const [mode, setMode] = useState("normal");
     const [loading, setLoading] = useState(true);
     const [radius, setRadius] = useState(200);
     const [source, setSource] = useState(0);
+    const [underspec, setUnderspec] = useState([]);
 
     // Initialize an variables to call it later
     let googleMap;
@@ -100,8 +109,8 @@ const MapComponent = () => {
     let polygon;
     let autoComplete;
     let drawingManager;
-    let drawingMode;
     let customPolygon;
+    let polygonSaved = [];
     let odpMarker = [];
     let directionsService;
     let directionsRenderer;
@@ -119,12 +128,8 @@ const MapComponent = () => {
                 zoom: 15,
                 center: center,
                 clickableIcons: false,
-                fullscreenControl: false,
-                mapTypeControl: false,
+                disableDefaultUI: true,
                 gestureHandling: "greedy",
-                mapTypeControlOptions: {
-                    position: window.google.maps.ControlPosition.BOTTOM_CENTER,
-                },
             });
 
             // --- NOTE ---
@@ -136,6 +141,7 @@ const MapComponent = () => {
             marker = new window.google.maps.Marker({
                 map: googleMap,
                 visible: false,
+                zIndex: 2,
             });
 
             // InfoWindow initialize
@@ -164,10 +170,9 @@ const MapComponent = () => {
             polygon = new window.google.maps.Polygon({
                 map: googleMap,
                 paths: [],
-                strokeOpacity: 0,
                 strokeWeight: 2,
-                fillColor: "#FF0000",
-                fillOpacity: 0.1,
+                strokeColor: "#FF3300",
+                fillOpacity: 0,
                 clickable: false,
             });
 
@@ -190,7 +195,7 @@ const MapComponent = () => {
             directionsService = new window.google.maps.DirectionsService();
             directionsRenderer = new window.google.maps.DirectionsRenderer({
                 suppressMarkers: true,
-                preserveViewport: true,
+                preserveViewport: false,
             });
 
             // Distance Matrix initialize
@@ -201,9 +206,11 @@ const MapComponent = () => {
     }, []);
 
     const mapEventListener = (): void => {
-        googleMap.addListener("click", (e: any): void => {
+        googleMap.addListener("click", (e: any): any => {
+            if (mapRef.current.dataset.mode != "normal") return false;
+
             if (inputRef.current) inputRef.current.value = "";
-            getLocation(e.latLng.lat(), e.latLng.lng(), radiusRef.current.value, source);
+            getLocation(e.latLng.lat(), e.latLng.lng(), radiusRef.current.value, parseInt(sourceRef.current.dataset.source));
         });
 
         window.google.maps.event.addListener(autoComplete, "place_changed", () => {
@@ -221,40 +228,150 @@ const MapComponent = () => {
                 googleMap.setZoom(16);
             }
 
-            getLocation(location.lat(), location.lng(), radiusRef.current.value, source);
+            getLocation(location.lat(), location.lng(), radiusRef.current.value, parseInt(sourceRef.current.dataset.source));
         });
 
         window.google.maps.event.addListener(drawingManager, "polygoncomplete", (e) => {
+            setMode("hand");
             customPolygon?.shape.setMap(null);
+            customPolygon = null;
             drawingManager.setDrawingMode(null);
             customPolygon = { type: "polygon", shape: e };
         });
 
         window.google.maps.event.addListener(drawingManager, "rectanglecomplete", (e) => {
+            setMode("hand");
             customPolygon?.shape.setMap(null);
+            customPolygon = null;
             drawingManager.setDrawingMode(null);
             customPolygon = { type: "rectangle", shape: e };
+        });
+
+        // To asign listener to component, use listener provided by Google Maps
+
+        const save = document.getElementById("savePolygon");
+        window.google.maps.event.addDomListener(save, "click", () => {
+            savePolygon();
+        });
+
+        const exit = document.getElementById("exitEditor");
+        window.google.maps.event.addDomListener(exit, "click", () => {
+            customPolygon?.shape.setMap(null);
+            customPolygon = null;
+            drawingManager.setDrawingMode(null);
+            setMode("normal");
+        });
+
+        const draw = document.getElementById("drawingMode");
+        window.google.maps.event.addDomListener(draw, "click", () => {
+            drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
+            setMode("rectangle");
+        });
+
+        const zoomIn = document.getElementById("zoomIn");
+        window.google.maps.event.addDomListener(zoomIn, "click", () => {
+            googleMap.setZoom(googleMap.getZoom() + 1);
+        });
+
+        const zoomOut = document.getElementById("zoomOut");
+        window.google.maps.event.addDomListener(zoomOut, "click", () => {
+            googleMap.setZoom(googleMap.getZoom() - 1);
+        });
+
+        const sourceOption = document.getElementsByClassName("map-source-option")[0];
+        window.google.maps.event.addDomListener(sourceOption, "click", (e) => {
+            if (e.target.classList.contains("option")) {
+                switch (e.target.innerText) {
+                    case "SIIS":
+                        setSource(0);
+                        if (marker.visible) {
+                            getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 0);
+                        }
+                        break;
+                    case "UIM":
+                        setSource(1);
+                        if (marker.visible) {
+                            getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 1);
+                        }
+                        break;
+                    case "Valins":
+                        setSource(2);
+                        if (marker.visible) {
+                            getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 2);
+                        }
+                        break;
+                    case "Underspec":
+                        setSource(3);
+                        if (marker.visible) {
+                            getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 3);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        });
+
+        const rectangleMode = document.getElementById("rectangleMode");
+        window.google.maps.event.addDomListener(rectangleMode, "click", () => {
+            if (mapRef.current.dataset.mode != "rectangle") {
+                setMode("rectangle");
+                customPolygon?.shape.setMap(null);
+                customPolygon = null;
+                drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
+            } else {
+                setMode("hand");
+                customPolygon?.shape.setMap(null);
+                customPolygon = null;
+                drawingManager?.setDrawingMode(null);
+            }
+        });
+
+        const polygonMode = document.getElementById("polygonMode");
+        window.google.maps.event.addDomListener(polygonMode, "click", () => {
+            if (mapRef.current.dataset.mode != "polygon") {
+                setMode("polygon");
+                customPolygon?.shape.setMap(null);
+                customPolygon = null;
+                drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
+            } else {
+                setMode("hand");
+                customPolygon?.shape.setMap(null);
+                customPolygon = null;
+                drawingManager?.setDrawingMode(null);
+            }
+        });
+
+        const deleteMode = document.getElementById("deleteMode");
+        window.google.maps.event.addDomListener(deleteMode, "click", () => {
+            if (mapRef.current.dataset.mode != "delete") {
+                setMode("delete");
+                customPolygon?.shape.setMap(null);
+                customPolygon = null;
+                drawingManager?.setDrawingMode(null);
+            } else {
+                setMode("hand");
+                customPolygon?.shape.setMap(null);
+                customPolygon = null;
+                drawingManager?.setDrawingMode(null);
+            }
         });
     };
 
     const getLocation = (lat: number, lng: number, radius: string, source: number) => {
         odpMarker.map((x) => x.setMap(null));
         if (directionsRenderer) directionsRenderer.setMap(null);
-        infoRef.current.style.display = "block";
 
         setLoading(true);
+        setStreetList([]);
+        setStreetStatus("");
         setStatus("Fetching data...");
         marker.setPosition({ lat, lng });
         marker.setVisible(true);
 
-        // infoWindow.setContent(`<div id="map-popup">Fetching data...</div>`);
-        // infoWindow.open(googleMap, marker);
-        console.log(radius);
-        console.log(source);
-
         polygon.setMap(null);
         circle.setMap(null);
-        circle.setMap(googleMap);
+        if (source != 3) circle.setMap(googleMap);
         circle.setCenter({ lat, lng });
         circle.setRadius(parseFloat(radius));
 
@@ -280,50 +397,18 @@ const MapComponent = () => {
 
                 setLoading(false);
                 setLocationName(name);
-
-                // Cannot use React Element to create custom popup, must using string
-                // const parentElement = document.getElementById("map-popup");
-                // if (parentElement) {
-                //     const { provinsi, kabupaten, kecamatan, kelurahan } = resolve.data.data[0];
-                //     const child = `
-                // <div>
-                // 	<span>${provinsi}</span>
-                // 	<span>${kabupaten}</span>
-                // 	<span>${kecamatan}</span>
-                // 	<span>${kelurahan}</span><br/>
-                // 	<span id="map-popup-odp-loading">Fetching ODP data...</span>
-                // </div>`;
-
-                //     parentElement.innerHTML = "";
-                //     parentElement.insertAdjacentHTML("beforeend", child);
-                // }
-
+                getStreetList(lat, lng);
                 getDirection(lat, lng, radius, source);
             })
             .catch((reject) => {
                 if (!axios.isCancel(reject)) {
                     console.log(reject);
-                    setStatus("Fetching failed!");
-                    // const parentElement = document.getElementById("map-popup");
-                    // const child = `
-                    // <div>
-                    // 	<div>Fetching failed !</div>
-                    // 	<span id="map-popup-edit">Try again...</span>
-                    // </div>
-                    // `;
-
-                    // parentElement.innerHTML = "";
-                    // parentElement.insertAdjacentHTML("beforeend", child);
-                    // document.getElementById("map-popup-edit").addEventListener("click", () => {
-                    //     infoWindow.setContent(`<div id="map-popup">Fetching again...</div>`);
-                    //     const position = marker.getPosition();
-                    //     getLocation(position.lat(), position.lng());
-                    // });
+                    setStatus("Fetching data failed!");
                 }
             });
     };
 
-    const getDirection = (lat: number, lng: number, radius: number, source: number): void => {
+    const getDirection = (lat: number, lng: number, radius: string, source: number): void => {
         setOdpStatus("Fetching ODP data...");
 
         let sourceUrl = "";
@@ -371,8 +456,12 @@ const MapComponent = () => {
                 }
                 setOdpStatus(`${odpData.length} ODP found (${odpPercent}%)`);
                 odpMarker = [];
-                googleMap.setCenter({ lat: lat, lng: lng });
-                if (odpData.length) googleMap.setZoom(17);
+                if (source != 3) {
+                    googleMap.setCenter({ lat: lat, lng: lng });
+                    if (odpData.length) googleMap.setZoom(18);
+                } else {
+                    if (odpData.length) googleMap.setZoom(16);
+                }
 
                 odpData.forEach((data: ODP, i: number) => {
                     let color: string;
@@ -411,28 +500,39 @@ const MapComponent = () => {
                         odpMarker[i].getPosition()
                     );
 
+                    let content = `
+                    <div class="map-infowindow">
+                        <span>Device ID: ${data.id}</span><br/>
+                        <span>Device name: ${data.name}</span><br/>
+                        <span>Status: ${data.status}</span><br/>
+                        <span>Device Port: ${data.device_port}</span><br/>
+                        <span>Idle Port: ${data.idle_port}</span>
+                        <span id="infoDistance"></span>
+                    </div>`;
+
                     odpMarker[i].infoWindow = new window.google.maps.InfoWindow({
-                        content: `<div>
-						<span>Device ID: ${data.id}</span><br/>
-						<span>Device name: ${data.name}</span><br/>
-						<span>Status: ${data.status}</span><br/>
-						<span>Device Port: ${data.device_port}</span><br/>
-						<span>Idle Port: ${data.idle_port}</span>
-					</div>`,
+                        content: content,
+                        zIndex: 2,
                     });
 
                     odpMarker[i].addListener("mouseover", () => {
+                        if (source == 3) {
+                            setUnderspec(data.underspec_detail);
+                        }
+
                         infoWindow.close();
                         odpMarker.map((x) => x.infoWindow.close());
                         odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
                     });
 
                     odpMarker[i].addListener("mouseout", () => {
+                        if (source == 3) {
+                            setUnderspec([]);
+                        }
                         odpMarker[i].infoWindow.close();
                     });
 
                     odpMarker[i].addListener("click", () => {
-                        infoWindow.close();
                         odpMarker.map((x) => x.infoWindow.close());
                         odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
                         directionsService.route(
@@ -443,6 +543,9 @@ const MapComponent = () => {
                             },
                             (response, status) => {
                                 if (status === "OK") {
+                                    console.log(response.routes[0].legs[0].distance.value);
+                                    const info = document.getElementById("infoDistance");
+                                    if (info) info.innerHTML = `<br/>Distance: ${response.routes[0].legs[0].distance.value} m`;
                                     directionsRenderer.setMap(googleMap);
                                     directionsRenderer.setDirections(response);
                                 } else {
@@ -465,9 +568,36 @@ const MapComponent = () => {
                 if (!axios.isCancel(reject)) {
                     console.log(reject);
                     setOdpStatus("Fetching ODP failed!");
-                    // const loading = document.getElementById("map-popup-odp-loading");
-                    // loading.innerHTML = `Fetching ODP failed!`;
                 }
+            });
+    };
+
+    const getStreetList = (lat: number, lng: number) => {
+        setStreetStatus("Loading street data...");
+
+        AxiosStreet({
+            url: "https://siis-api.udata.id/point_to_address",
+            method: "post",
+            data: { lat: lat.toString(), long: lng.toString(), radius: "50" },
+        })
+            .then((resolve) => {
+                if (resolve.data.status == "success") {
+                    const list = resolve.data.data.filter((x) => x.st_name != " ").map((x) => titleCase(x.st_name));
+                    if (list.length > 0) {
+                        const uniqueList = [...new Set(list)];
+                        setStreetStatus(`${uniqueList.length} street${uniqueList.length > 1 ? "s" : ""} found`);
+                        setStreetList(uniqueList);
+                    } else {
+                        setStreetStatus("No street data found!");
+                    }
+                } else {
+                    console.log(resolve.data);
+                    setStreetStatus("No street data found!");
+                }
+            })
+            .catch((reject) => {
+                console.log(reject);
+                setStreetStatus("Fetching street data failed!");
             });
     };
 
@@ -514,52 +644,78 @@ const MapComponent = () => {
     };
 
     const findMe = () => {
-        if (customPolygon?.type == "polygon") {
-            const xxx = customPolygon.shape.getPath().getArray();
-            console.log(
-                xxx.map((x) => {
-                    return {
-                        lat: x.lat(),
-                        lng: x.lng(),
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                ({ coords }) => {
+                    if (inputRef.current) inputRef.current.value = "";
+                    const position = {
+                        lat: coords.latitude,
+                        lng: coords.longitude,
                     };
-                })
+
+                    googleMap.setCenter(position);
+                    googleMap.setZoom(17);
+                    getLocation(coords.latitude, coords.longitude, radiusRef.current.value, parseInt(sourceRef.current.dataset.source));
+                },
+                () => {
+                    alert("The Geolocation service failed.");
+                }
             );
+        } else {
+            alert("Your browser doesn't support geolocation.");
+        }
+    };
+
+    const savePolygon = () => {
+        let path = [];
+        if (customPolygon?.type == "polygon") {
+            const shape = customPolygon.shape.getPath().getArray();
+            path = shape.map((x) => {
+                return new window.google.maps.LatLng(x.lat(), x.lng());
+            });
+            drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
         } else if (customPolygon?.type == "rectangle") {
             const bounds = customPolygon.shape.getBounds();
             var NE = bounds.getNorthEast();
             var SW = bounds.getSouthWest();
-            console.log({
-                1: bounds.getNorthEast(),
-                2: bounds.getSouthWest(),
-                3: new window.google.maps.LatLng(NE.lat(), SW.lng()),
-                4: new window.google.maps.LatLng(SW.lat(), NE.lng()),
-            });
+            path = [
+                new window.google.maps.LatLng(SW.lat(), NE.lng()),
+                bounds.getNorthEast(),
+                new window.google.maps.LatLng(NE.lat(), SW.lng()),
+                bounds.getSouthWest(),
+            ];
+            drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
         }
-        // if (navigator.geolocation) {
-        //     navigator.geolocation.getCurrentPosition(
-        //         ({ coords }) => {
-        //             if (inputRef.current) inputRef.current.value = "";
-        //             const position = {
-        //                 lat: coords.latitude,
-        //                 lng: coords.longitude,
-        //             };
 
-        //             googleMap.setCenter(position);
-        //             googleMap.setZoom(17);
-        //             getLocation(coords.latitude, coords.longitude);
-        //         },
-        //         () => {
-        //             alert("The Geolocation service failed.");
-        //         }
-        //     );
-        // } else {
-        //     alert("Your browser doesn't support geolocation.");
-        // }
+        const polygon = new window.google.maps.Polygon({
+            map: googleMap,
+            paths: path,
+            strokeColor: "#FF3300",
+            strokeWeight: 2,
+            fillOpacity: 0.5,
+            fillColor: "#FF3300",
+            clickable: true,
+        });
+
+        polygon.addListener("mouseover", () => {
+            if (mapRef.current.dataset.mode == "delete") polygon.setOptions({ fillColor: "#00FF00" });
+        });
+        polygon.addListener("mouseout", () => {
+            polygon.setOptions({ fillColor: "#FF3300" });
+        });
+        polygon.addListener("click", () => {
+            if (mapRef.current.dataset.mode == "delete") polygon.setMap(null);
+        });
+
+        customPolygon?.shape.setMap(null);
+        if (customPolygon) polygonSaved.push(polygon);
+        customPolygon = null;
     };
 
     return (
         <div className="map-page">
-            <div className="map-container" ref={mapRef} />
+            <div className="map-container" ref={mapRef} data-mode={mode} />
+
             <Menu
                 inputRef={inputRef}
                 radiusRef={radiusRef}
@@ -568,14 +724,31 @@ const MapComponent = () => {
                     setRadius(e);
                 }}
                 source={source}
-            />
-            <Info infoRef={infoRef} locationName={locationName} status={status} odpStatus={odpStatus} loading={loading} />
-            <Button
-                findMe={findMe}
-                setDrawingMode={(e) => {
-                    drawingMode = e;
+                setSource={(e: number) => {
+                    setSource(e);
                 }}
+                sourceRef={sourceRef}
+                hide={mode == "normal" ? false : true}
             />
+            <Info
+                infoRef={infoRef}
+                locationName={locationName}
+                status={status}
+                odpStatus={odpStatus}
+                loading={loading}
+                hide={mode == "normal" && status ? false : true}
+            />
+            <Button findMe={findMe} hide={mode == "normal" ? false : true} />
+            <Editor mode={mode} disabled={customPolygon ? false : true} />
+            <Underspec underspec={underspec} hide={underspec.length ? false : true} />
+            <StreetList
+                streetList={streetList}
+                status={streetStatus}
+                ref={streetRef}
+                hide={mode == "normal" && status && streetStatus ? false : true}
+            />
+
+            <ReactTooltip effect="solid" place="left" />
         </div>
     );
 };
@@ -594,6 +767,12 @@ interface ODP {
     status: string;
     device_port: number;
     idle_port: number;
+    underspec_detail?: Underspec[];
+}
+interface Underspec {
+    inet: string;
+    olt_rx_pwr: string;
+    onu_rx_pwr: string;
 }
 
 export default MapComponent;

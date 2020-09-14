@@ -1,0 +1,238 @@
+$shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
+
+/* ==================== */
+
+.map-page {
+    width: 100vw;
+    height: 100vh;
+}
+.map-container {
+    width: 100%;
+    height: 100%;
+}
+.map-infowindow {
+    max-width: 200px;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+/* ==================== */
+
+.map-info,
+.map-drawer {
+    position: fixed;
+    background-color: white;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: $shadow;
+    left: 50%;
+    bottom: 10px;
+    transform: translate(-50%);
+}
+
+/* ==================== */
+
+.map-info {
+    max-width: 320px;
+    font-size: 1.1rem;
+    text-align: center;
+
+    .odp {
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* ==================== */
+
+.map-menu {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    border-radius: 3px;
+    // background-color: white;
+    // box-shadow: $shadow
+    // border-radius: 5px;
+}
+
+.map-search-bar {
+    display: block;
+    box-shadow: $shadow;
+    outline: none;
+    border: none;
+    border-radius: 3px;
+    width: 340px;
+    height: 40px;
+    margin-bottom: 10px;
+    padding: 0 10px;
+    font-size: 1.1rem;
+}
+.map-radius-slider {
+    display: inline-block;
+    background-color: white;
+    width: max-content;
+    padding: 10px;
+    border-radius: 3px;
+    box-shadow: $shadow;
+
+    span {
+        margin-right: 10px;
+    }
+}
+.map-source-option {
+    margin: 16px 0;
+
+    span {
+        background-color: white;
+        font-size: 1.2rem;
+        padding: 7px 10px;
+        border-radius: 3px;
+        box-shadow: $shadow;
+        margin-right: 15px;
+        cursor: pointer;
+
+        &:nth-child(4) {
+            margin: 0;
+        }
+        &.active {
+            color: red;
+        }
+    }
+}
+
+/* ==================== */
+
+.map-button {
+    position: fixed;
+    right: 10px;
+    bottom: 100px;
+
+    svg {
+        cursor: pointer;
+        background-color: white;
+        padding: 8px;
+        margin-bottom: 10px;
+        display: block;
+        border-radius: 5px;
+        box-shadow: $shadow;
+        width: 46px;
+        height: 46px;
+        color: rgba(0, 0, 0, 0.8);
+
+        &:hover {
+            background-color: whitesmoke;
+            color: black;
+        }
+    }
+}
+
+/* ==================== */
+
+.map-drawer {
+    display: block;
+}
+.map-drawer-option {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    justify-items: center;
+    margin-bottom: 20px;
+
+    .option {
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        color: rgba(0, 0, 0, 0.8);
+
+        &.active {
+            color: red;
+        }
+        &:hover {
+            color: red;
+        }
+    }
+}
+.map-drawer-button {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    text-align: center;
+
+    div {
+        cursor: pointer;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+        padding: 5px;
+
+        &:hover {
+            color: red;
+            border-bottom: 1px solid red;
+        }
+        &.disabled {
+            cursor: default;
+            color: black;
+
+            &:hover {
+                color: black;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            }
+        }
+    }
+}
+
+/* ==================== */
+
+.map-street {
+    position: fixed;
+    left: 10px;
+    bottom: 10px;
+    background-color: white;
+    box-shadow: $shadow;
+    padding: 15px;
+    border-radius: 5px;
+
+    .list {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* ==================== */
+
+.map-underspec {
+    position: fixed;
+    right: 10px;
+    top: 10px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: $shadow;
+}
+
+/* ==================== */
+
+.hide {
+    display: none !important;
+}
+
+table,
+th,
+td {
+    border: 1px solid black;
+    border-collapse: collapse;
+}
+th,
+td {
+    padding: 10px;
+    text-align: center;
+}
+
+a[href^="http://maps.google.com/maps"],
+a[href^="https://maps.google.com/maps"],
+a[href^="https://www.google.com/maps"]
+{
+    display: none !important;
+}
+.gmnoprint:not(.gm-bundled-control) {
+    display: none;
+}

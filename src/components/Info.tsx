@@ -1,14 +1,14 @@
 import React from "react";
 
-const Info = ({ infoRef, locationName, status, odpStatus, loading }) => {
+const Info = ({ infoRef, locationName, status, odpStatus, loading, hide }) => {
     return (
-        <div className="map-info" ref={infoRef}>
+        <div className={"map-info" + (hide ? " hide" : "")} ref={infoRef}>
             {loading ? (
-                <div>{status}</div>
+                <div className="loading">{status}</div>
             ) : (
                 <>
-                    <div>{odpStatus}</div>
-                    <div>{locationName}</div>
+                    <div className="odp">{odpStatus}</div>
+                    <div className="address">{locationName}</div>
                 </>
             )}
         </div>
