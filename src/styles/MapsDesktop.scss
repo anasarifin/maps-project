@@ -51,9 +51,6 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
     top: 10px;
     left: 10px;
     border-radius: 3px;
-    // background-color: white;
-    // box-shadow: $shadow
-    // border-radius: 5px;
 }
 
 .map-search-bar {
@@ -131,13 +128,14 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
 
 .map-drawer {
     display: block;
+    width: 240px;
 }
 .map-drawer-option {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     justify-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 
     .option {
         cursor: pointer;
@@ -153,29 +151,47 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
         }
     }
 }
-.map-drawer-button {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+#exitEditor {
+    width: 100%;
     text-align: center;
+    cursor: pointer;
+    border-top: 1px solid rgba(0, 0, 0, 0.5);
+    padding-top: 15px;
 
-    div {
+    &:hover {
+        color: red;
+    }
+}
+
+/* ==================== */
+
+.map-save {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translate(-50%);
+
+    input {
+        width: 360px;
+        height: 30px;
+        padding: 25px 50px 25px 15px;
+        box-shadow: $shadow;
+        outline: none;
+        border: none;
+        border-radius: 3px;
+    }
+
+    #savePolygon {
+        position: absolute;
+        top: 50%;
+        right: 10px;
+        width: 30px;
+        height: 30px;
+        transform: translateY(-50%);
         cursor: pointer;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.5);
-        padding: 5px;
 
         &:hover {
             color: red;
-            border-bottom: 1px solid red;
-        }
-        &.disabled {
-            cursor: default;
-            color: black;
-
-            &:hover {
-                color: black;
-                border-bottom: 1px solid rgba(0, 0, 0, 0.5);
-            }
         }
     }
 }
@@ -200,13 +216,32 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
 
 /* ==================== */
 
-.map-underspec {
+.map-underspec,
+.map-profile {
     position: fixed;
     right: 10px;
     top: 10px;
     background-color: white;
     border-radius: 5px;
     box-shadow: $shadow;
+}
+
+.map-profile {
+    padding: 10px;
+
+    div {
+        text-align: center;
+    }
+    .role {
+        margin: 10px 0;
+        padding: 10px 0;
+        border-top: 1px solid rgba(0, 0, 0, 0.5);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+    }
+    .logout {
+        color: blue;
+        cursor: pointer;
+    }
 }
 
 /* ==================== */

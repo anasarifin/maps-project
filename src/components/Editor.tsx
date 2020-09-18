@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { BiRectangle, BiShapePolygon, BiTrash } from "react-icons/bi";
 
-const Editor = ({ mode, disabled }) => {
+const Editor = ({ mode }) => {
     useEffect(() => {
         console.log(mode);
     }, [mode]);
@@ -33,9 +33,6 @@ const Editor = ({ mode, disabled }) => {
             </div>
             <div className="map-drawer-button">
                 <div id="exitEditor">Exit Editor</div>
-                <div id="savePolygon" className={disabled ? "disabled" : ""}>
-                    Save Polygon
-                </div>
             </div>
         </div>
     );

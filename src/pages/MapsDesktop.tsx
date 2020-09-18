@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { useLocation } from "react-router-dom";
 import AxiosCancelRequest from "axios-cancel-request";
 const AxiosLocation = AxiosCancelRequest(axios);
 const AxiosDirection = AxiosCancelRequest(axios);
@@ -10,9 +11,11 @@ import "../styles/MapsDesktop.scss";
 import Menu from "../components/Menu";
 import Info from "../components/Info";
 import Editor from "../components/Editor";
+import Save from "../components/Save";
 import Button from "../components/Button";
 import Underspec from "../components/Underspec";
 import StreetList from "../components/StreetList";
+import Profile from "../components/Profile";
 
 const center = {
     lat: -6.2088,
@@ -83,7 +86,7 @@ const odpFormat = (odpList, source: number) => {
     }
 };
 
-const MapComponent = () => {
+const MapComponent = ({ profile }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const infoRef = useRef<HTMLDivElement>(null);
     const streetRef = useRef<HTMLDivElement>(null);
@@ -97,8 +100,9 @@ const MapComponent = () => {
     const [streetStatus, setStreetStatus] = useState("");
     const [mode, setMode] = useState("normal");
     const [loading, setLoading] = useState(true);
+    const [showSave, setShowSave] = useState(false);
     const [radius, setRadius] = useState(200);
-    const [source, setSource] = useState(0);
+    const [source, setSource] = useState(1);
     const [underspec, setUnderspec] = useState([]);
 
     // Initialize an variables to call it later
@@ -115,6 +119,17 @@ const MapComponent = () => {
     let directionsService;
     let directionsRenderer;
     let distanceMatrix;
+
+    useEffect(() => {
+        const role = profile.permission;
+        if (role.uim) {
+            setSource(1);
+        } else if (role.valins) {
+            setSource(2);
+        } else if (role.underspec) {
+            setSource(3);
+        }
+    }, [profile]);
 
     useEffect(() => {
         // Create script element and call google maps api
@@ -234,17 +249,18 @@ const MapComponent = () => {
         window.google.maps.event.addListener(drawingManager, "polygoncomplete", (e) => {
             setMode("hand");
             customPolygon?.shape.setMap(null);
-            customPolygon = null;
             drawingManager.setDrawingMode(null);
             customPolygon = { type: "polygon", shape: e };
+
+            setShowSave(true);
         });
 
         window.google.maps.event.addListener(drawingManager, "rectanglecomplete", (e) => {
             setMode("hand");
             customPolygon?.shape.setMap(null);
-            customPolygon = null;
             drawingManager.setDrawingMode(null);
             customPolygon = { type: "rectangle", shape: e };
+            setShowSave(true);
         });
 
         // To asign listener to component, use listener provided by Google Maps
@@ -257,7 +273,7 @@ const MapComponent = () => {
         const exit = document.getElementById("exitEditor");
         window.google.maps.event.addDomListener(exit, "click", () => {
             customPolygon?.shape.setMap(null);
-            customPolygon = null;
+            setShowSave(false);
             drawingManager.setDrawingMode(null);
             setMode("normal");
         });
@@ -285,24 +301,28 @@ const MapComponent = () => {
                     case "SIIS":
                         setSource(0);
                         if (marker.visible) {
+                            odpMarker.map((x) => x.setMap(null));
                             getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 0);
                         }
                         break;
                     case "UIM":
                         setSource(1);
                         if (marker.visible) {
+                            odpMarker.map((x) => x.setMap(null));
                             getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 1);
                         }
                         break;
                     case "Valins":
                         setSource(2);
                         if (marker.visible) {
+                            odpMarker.map((x) => x.setMap(null));
                             getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 2);
                         }
                         break;
                     case "Underspec":
                         setSource(3);
                         if (marker.visible) {
+                            odpMarker.map((x) => x.setMap(null));
                             getDirection(marker.getPosition().lat(), marker.getPosition().lng(), radiusRef.current.value, 3);
                         }
                         break;
@@ -317,12 +337,12 @@ const MapComponent = () => {
             if (mapRef.current.dataset.mode != "rectangle") {
                 setMode("rectangle");
                 customPolygon?.shape.setMap(null);
-                customPolygon = null;
+                setShowSave(false);
                 drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
             } else {
                 setMode("hand");
                 customPolygon?.shape.setMap(null);
-                customPolygon = null;
+                setShowSave(false);
                 drawingManager?.setDrawingMode(null);
             }
         });
@@ -332,12 +352,12 @@ const MapComponent = () => {
             if (mapRef.current.dataset.mode != "polygon") {
                 setMode("polygon");
                 customPolygon?.shape.setMap(null);
-                customPolygon = null;
+                setShowSave(false);
                 drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
             } else {
                 setMode("hand");
                 customPolygon?.shape.setMap(null);
-                customPolygon = null;
+                setShowSave(false);
                 drawingManager?.setDrawingMode(null);
             }
         });
@@ -347,12 +367,12 @@ const MapComponent = () => {
             if (mapRef.current.dataset.mode != "delete") {
                 setMode("delete");
                 customPolygon?.shape.setMap(null);
-                customPolygon = null;
+                setShowSave(false);
                 drawingManager?.setDrawingMode(null);
             } else {
                 setMode("hand");
                 customPolygon?.shape.setMap(null);
-                customPolygon = null;
+                setShowSave(false);
                 drawingManager?.setDrawingMode(null);
             }
         });
@@ -673,6 +693,7 @@ const MapComponent = () => {
             path = shape.map((x) => {
                 return new window.google.maps.LatLng(x.lat(), x.lng());
             });
+            setMode("polygon");
             drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
         } else if (customPolygon?.type == "rectangle") {
             const bounds = customPolygon.shape.getBounds();
@@ -684,6 +705,7 @@ const MapComponent = () => {
                 new window.google.maps.LatLng(NE.lat(), SW.lng()),
                 bounds.getSouthWest(),
             ];
+            setMode("rectangle");
             drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
         }
 
@@ -709,7 +731,7 @@ const MapComponent = () => {
 
         customPolygon?.shape.setMap(null);
         if (customPolygon) polygonSaved.push(polygon);
-        customPolygon = null;
+        setShowSave(false);
     };
 
     return (
@@ -720,6 +742,7 @@ const MapComponent = () => {
                 inputRef={inputRef}
                 radiusRef={radiusRef}
                 radius={radius}
+                role={profile.permission}
                 setRadius={(e: number) => {
                     setRadius(e);
                 }}
@@ -739,7 +762,9 @@ const MapComponent = () => {
                 hide={mode == "normal" && status ? false : true}
             />
             <Button findMe={findMe} hide={mode == "normal" ? false : true} />
-            <Editor mode={mode} disabled={customPolygon ? false : true} />
+            <Editor mode={mode} />
+            <Save hide={showSave ? false : true} />
+            <Profile data={profile} hide={underspec.length ? true : false} />
             <Underspec underspec={underspec} hide={underspec.length ? false : true} />
             <StreetList
                 streetList={streetList}
@@ -753,10 +778,29 @@ const MapComponent = () => {
     );
 };
 
+const MapReady = () => {
+    const [ready, setReady] = useState(false);
+    const [profile, setProfile] = useState(false);
+    const location: Location = useLocation();
+
+    useEffect(() => {
+        if (location.state?.profile) {
+            setProfile(location.state.profile);
+            setReady(true);
+        }
+    }, [location.state]);
+
+    return <>{ready ? <MapComponent profile={profile} /> : <></>}</>;
+};
+
 declare global {
     interface Window {
         google: any;
     }
+}
+
+interface Location {
+    state: any;
 }
 
 interface ODP {
@@ -775,4 +819,4 @@ interface Underspec {
     onu_rx_pwr: string;
 }
 
-export default MapComponent;
+export default MapReady;

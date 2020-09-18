@@ -21,7 +21,7 @@ function titleCase(str: string): string {
         .join(" ");
 }
 
-const MapComponent = () => {
+const MapComponent = ({ profile, logout }) => {
     const mapRef = useRef<HTMLDivElement>();
     const inputRef = useRef<HTMLInputElement>();
     const bottomRef = useRef<HTMLDivElement>();

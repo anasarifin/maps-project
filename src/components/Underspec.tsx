@@ -1,5 +1,20 @@
 import React from "react";
 
+const klasifikasi = (onu: number, olt: number) => {
+    const number = onu < olt ? onu : olt;
+    if (number >= -24) {
+        return "Very good";
+    } else if (number < -24 && number >= -27) {
+        return "Good";
+    } else if (number < -27 && number >= -30) {
+        return "Poor";
+    } else if (number < -30) {
+        return "Bad";
+    } else {
+        return "";
+    }
+};
+
 const Underspec = ({ underspec, hide }) => {
     return (
         <div className={"map-underspec" + (hide ? " hide" : "")}>
@@ -15,8 +30,8 @@ const Underspec = ({ underspec, hide }) => {
                         <tr>
                             <td>{x.inet}</td>
                             <td>{x.olt_rx_pwr}</td>
-                            <td>{x.olt_rx_pwr}</td>
-                            <td>Baik sekali</td>
+                            <td>{x.onu_rx_pwr}</td>
+                            <td>{klasifikasi(parseFloat(x.onu_rx_pwr), parseFloat(x.olt_rx_pwr))}</td>
                         </tr>
                     );
                 })}

@@ -1,13 +1,13 @@
-import React from "react";
+import React, { useEffect } from "react";
 
-const Menu = ({ inputRef, radiusRef, radius, setRadius, source, setSource, sourceRef, hide }) => {
+const Menu = ({ role, inputRef, radiusRef, radius, setRadius, source, setSource, sourceRef, hide }) => {
     return (
         <div className={"map-menu" + (hide ? " hide" : "")}>
             <input className="map-search-bar" ref={inputRef} placeholder="Search here..." />
             <div className="map-source-option" data-source={source} ref={sourceRef}>
-                <span className={"option" + (source == 0 ? " active" : "")}>SIIS</span>
+                {/* <span className={"option" + (source == 0 ? " active" : "")}>SIIS</span> */}
                 <span
-                    className={"option" + (source == 1 ? " active" : "")}
+                    className={"option" + (source == 1 ? " active" : "") + (role.uim ? "" : " hide")}
                     onClick={() => {
                         setSource(1);
                     }}
@@ -15,7 +15,7 @@ const Menu = ({ inputRef, radiusRef, radius, setRadius, source, setSource, sourc
                     UIM
                 </span>
                 <span
-                    className={"option" + (source == 2 ? " active" : "")}
+                    className={"option" + (source == 2 ? " active" : "") + (role.valins ? "" : " hide")}
                     onClick={() => {
                         setSource(2);
                     }}
@@ -23,7 +23,7 @@ const Menu = ({ inputRef, radiusRef, radius, setRadius, source, setSource, sourc
                     Valins
                 </span>
                 <span
-                    className={"option" + (source == 3 ? " active" : "")}
+                    className={"option" + (source == 3 ? " active" : "") + (role.underspec ? "" : " hide")}
                     onClick={() => {
                         setSource(3);
                     }}
