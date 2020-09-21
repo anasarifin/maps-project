@@ -1,7 +1,7 @@
 import React from "react";
 import { useHistory } from "react-router-dom";
 
-const Profile = ({ data, hide }) => {
+const Profile = ({ data, hide }: Props) => {
     const history = useHistory();
 
     return (
@@ -11,7 +11,7 @@ const Profile = ({ data, hide }) => {
             <div
                 onClick={() => {
                     window.localStorage.removeItem("loginState");
-                    history.replace({ pathname: "/login" });
+                    history.push({ pathname: "/" });
                 }}
                 className="logout"
             >
@@ -20,5 +20,10 @@ const Profile = ({ data, hide }) => {
         </div>
     );
 };
+
+interface Props {
+    data: any;
+    hide?: boolean;
+}
 
 export default Profile;

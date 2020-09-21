@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 
-const Menu = ({ role, inputRef, radiusRef, radius, setRadius, source, setSource, sourceRef, hide }) => {
+const Menu = ({ role, inputRef, radiusRef, radius, setRadius, source, setSource, sourceRef }) => {
     return (
-        <div className={"map-menu" + (hide ? " hide" : "")}>
+        <div className="map-menu">
             <input className="map-search-bar" ref={inputRef} placeholder="Search here..." />
             <div className="map-source-option" data-source={source} ref={sourceRef}>
                 {/* <span className={"option" + (source == 0 ? " active" : "")}>SIIS</span> */}

@@ -6,12 +6,7 @@ import App from "./App";
 import "./index.css";
 import "regenerator-runtime";
 
-ReactDOM.render(
-    <BrowserRouter>
-        <App />
-    </BrowserRouter>,
-    document.getElementById("root")
-);
+ReactDOM.render(<App />, document.getElementById("root"));
 
 // if ("serviceWorker" in navigator) {
 // 	window.addEventListener("load", () => {

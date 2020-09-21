@@ -1,14 +1,23 @@
 import React, { useEffect } from "react";
 import { BiRectangle, BiShapePolygon, BiTrash } from "react-icons/bi";
+import { MdSave } from "react-icons/md";
+import { HiOutlineHand } from "react-icons/hi";
 
-const Editor = ({ mode }) => {
-    useEffect(() => {
-        console.log(mode);
-    }, [mode]);
-
+const Drawer = ({ mode, hide, hideSave, saveRef }) => {
     return (
-        <div className={"map-drawer" + (mode == "normal" ? " hide" : "")}>
+        <div className="map-drawer">
+            <div className={"map-save" + (hideSave ? " hide" : "")}>
+                <input placeholder="Input address..." ref={saveRef} />
+                <MdSave id="savePolygon" />
+            </div>
             <div className="map-drawer-option">
+                <HiOutlineHand
+                    id="handMode"
+                    data-place="top"
+                    data-mode="hand"
+                    data-tip="Move"
+                    className={"option" + (mode == "hand" ? " active" : "")}
+                />
                 <BiRectangle
                     id="rectangleMode"
                     data-place="top"
@@ -31,11 +40,8 @@ const Editor = ({ mode }) => {
                     className={"option" + (mode == "delete" ? " active" : "")}
                 />
             </div>
-            <div className="map-drawer-button">
-                <div id="exitEditor">Exit Editor</div>
-            </div>
         </div>
     );
 };
 
-export default Editor;
+export default Drawer;

@@ -1,7 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-import { useLocation } from "react-router-dom";
+import { useHistory } from "react-router-dom";
+import { useRecoilState } from "recoil";
+import { profile as profileState } from "../recoil";
+import checkUser from "../configs/checkUser";
 import AxiosCancelRequest from "axios-cancel-request";
 const AxiosLocation = AxiosCancelRequest(axios);
 const AxiosDirection = AxiosCancelRequest(axios);
@@ -10,8 +13,6 @@ import ReactTooltip from "react-tooltip";
 import "../styles/MapsDesktop.scss";
 import Menu from "../components/Menu";
 import Info from "../components/Info";
-import Editor from "../components/Editor";
-import Save from "../components/Save";
 import Button from "../components/Button";
 import Underspec from "../components/Underspec";
 import StreetList from "../components/StreetList";
@@ -104,11 +105,11 @@ const MapComponent = ({ profile }) => {
     const [radius, setRadius] = useState(200);
     const [source, setSource] = useState(1);
     const [underspec, setUnderspec] = useState([]);
+    // const profile = useRecoilValue(profileState);
 
     // Initialize an variables to call it later
     let googleMap;
     let marker;
-    let infoWindow;
     let circle;
     let polygon;
     let autoComplete;
@@ -158,9 +159,6 @@ const MapComponent = ({ profile }) => {
                 visible: false,
                 zIndex: 2,
             });
-
-            // InfoWindow initialize
-            infoWindow = new window.google.maps.InfoWindow();
 
             // AutoComplete initialize, cannot use useRef to get element
             const inputElement = inputRef.current;
@@ -246,44 +244,6 @@ const MapComponent = ({ profile }) => {
             getLocation(location.lat(), location.lng(), radiusRef.current.value, parseInt(sourceRef.current.dataset.source));
         });
 
-        window.google.maps.event.addListener(drawingManager, "polygoncomplete", (e) => {
-            setMode("hand");
-            customPolygon?.shape.setMap(null);
-            drawingManager.setDrawingMode(null);
-            customPolygon = { type: "polygon", shape: e };
-
-            setShowSave(true);
-        });
-
-        window.google.maps.event.addListener(drawingManager, "rectanglecomplete", (e) => {
-            setMode("hand");
-            customPolygon?.shape.setMap(null);
-            drawingManager.setDrawingMode(null);
-            customPolygon = { type: "rectangle", shape: e };
-            setShowSave(true);
-        });
-
-        // To asign listener to component, use listener provided by Google Maps
-
-        const save = document.getElementById("savePolygon");
-        window.google.maps.event.addDomListener(save, "click", () => {
-            savePolygon();
-        });
-
-        const exit = document.getElementById("exitEditor");
-        window.google.maps.event.addDomListener(exit, "click", () => {
-            customPolygon?.shape.setMap(null);
-            setShowSave(false);
-            drawingManager.setDrawingMode(null);
-            setMode("normal");
-        });
-
-        const draw = document.getElementById("drawingMode");
-        window.google.maps.event.addDomListener(draw, "click", () => {
-            drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
-            setMode("rectangle");
-        });
-
         const zoomIn = document.getElementById("zoomIn");
         window.google.maps.event.addDomListener(zoomIn, "click", () => {
             googleMap.setZoom(googleMap.getZoom() + 1);
@@ -296,6 +256,7 @@ const MapComponent = ({ profile }) => {
 
         const sourceOption = document.getElementsByClassName("map-source-option")[0];
         window.google.maps.event.addDomListener(sourceOption, "click", (e) => {
+            console.log("masuk");
             if (e.target.classList.contains("option")) {
                 switch (e.target.innerText) {
                     case "SIIS":
@@ -329,51 +290,6 @@ const MapComponent = ({ profile }) => {
                     default:
                         break;
                 }
-            }
-        });
-
-        const rectangleMode = document.getElementById("rectangleMode");
-        window.google.maps.event.addDomListener(rectangleMode, "click", () => {
-            if (mapRef.current.dataset.mode != "rectangle") {
-                setMode("rectangle");
-                customPolygon?.shape.setMap(null);
-                setShowSave(false);
-                drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
-            } else {
-                setMode("hand");
-                customPolygon?.shape.setMap(null);
-                setShowSave(false);
-                drawingManager?.setDrawingMode(null);
-            }
-        });
-
-        const polygonMode = document.getElementById("polygonMode");
-        window.google.maps.event.addDomListener(polygonMode, "click", () => {
-            if (mapRef.current.dataset.mode != "polygon") {
-                setMode("polygon");
-                customPolygon?.shape.setMap(null);
-                setShowSave(false);
-                drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
-            } else {
-                setMode("hand");
-                customPolygon?.shape.setMap(null);
-                setShowSave(false);
-                drawingManager?.setDrawingMode(null);
-            }
-        });
-
-        const deleteMode = document.getElementById("deleteMode");
-        window.google.maps.event.addDomListener(deleteMode, "click", () => {
-            if (mapRef.current.dataset.mode != "delete") {
-                setMode("delete");
-                customPolygon?.shape.setMap(null);
-                setShowSave(false);
-                drawingManager?.setDrawingMode(null);
-            } else {
-                setMode("hand");
-                customPolygon?.shape.setMap(null);
-                setShowSave(false);
-                drawingManager?.setDrawingMode(null);
             }
         });
     };
@@ -540,7 +456,6 @@ const MapComponent = ({ profile }) => {
                             setUnderspec(data.underspec_detail);
                         }
 
-                        infoWindow.close();
                         odpMarker.map((x) => x.infoWindow.close());
                         odpMarker[i].infoWindow.open(googleMap, odpMarker[i]);
                     });
@@ -751,7 +666,6 @@ const MapComponent = ({ profile }) => {
                     setSource(e);
                 }}
                 sourceRef={sourceRef}
-                hide={mode == "normal" ? false : true}
             />
             <Info
                 infoRef={infoRef}
@@ -759,11 +673,9 @@ const MapComponent = ({ profile }) => {
                 status={status}
                 odpStatus={odpStatus}
                 loading={loading}
-                hide={mode == "normal" && status ? false : true}
+                hide={status ? false : true}
             />
-            <Button findMe={findMe} hide={mode == "normal" ? false : true} />
-            <Editor mode={mode} />
-            <Save hide={showSave ? false : true} />
+            <Button findMe={findMe} />
             <Profile data={profile} hide={underspec.length ? true : false} />
             <Underspec underspec={underspec} hide={underspec.length ? false : true} />
             <StreetList
@@ -780,15 +692,23 @@ const MapComponent = ({ profile }) => {
 
 const MapReady = () => {
     const [ready, setReady] = useState(false);
-    const [profile, setProfile] = useState(false);
-    const location: Location = useLocation();
+    const [profile, setProfile] = useRecoilState(profileState);
+    const history = useHistory();
 
     useEffect(() => {
-        if (location.state?.profile) {
-            setProfile(location.state.profile);
+        if (profile.name) {
             setReady(true);
+        } else {
+            checkUser()
+                .then((resolve: Profile) => {
+                    setProfile(resolve);
+                    setReady(true);
+                })
+                .catch(() => {
+                    history.replace({ pathname: "/login" });
+                });
         }
-    }, [location.state]);
+    });
 
     return <>{ready ? <MapComponent profile={profile} /> : <></>}</>;
 };
@@ -798,11 +718,11 @@ declare global {
         google: any;
     }
 }
-
-interface Location {
-    state: any;
+interface Profile {
+    name: string;
+    role: string;
+    permission: any;
 }
-
 interface ODP {
     id: string;
     name: string;

@@ -1,14 +1,18 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useHistory } from "react-router-dom";
+import { useSetRecoilState, useRecoilState } from "recoil";
+import { profile as profileState } from "../recoil";
+import checkUser from "../configs/checkUser";
 import axios from "axios";
 import "../styles/Login.scss";
 
-const Login = ({ success }) => {
+const LoginComponent = () => {
     const [type, setType] = useState(0);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
     const idRef = useRef<HTMLInputElement>(null);
     const passRef = useRef<HTMLInputElement>(null);
+    const setProfile = useSetRecoilState(profileState);
     const history = useHistory();
 
     const login = (type: number) => {
@@ -27,7 +31,7 @@ const Login = ({ success }) => {
             })
             .then((resolve) => {
                 if (resolve.data.success) {
-                    success(resolve.data.data);
+                    setProfile(resolve.data.data);
                     window.localStorage.setItem("loginState", resolve.data.data);
                     history.replace({ pathname: "/" });
                 }
@@ -75,4 +79,21 @@ const Login = ({ success }) => {
     );
 };
 
-export default Login;
+const LoginReady = () => {
+    const [ready, setReady] = useState(false);
+    const history = useHistory();
+
+    useEffect(() => {
+        const loginState = window.localStorage.getItem("loginState");
+
+        if (!loginState) {
+            setReady(true);
+        } else {
+            history.replace({ pathname: "/" });
+        }
+    });
+
+    return <>{ready ? <LoginComponent /> : <></>}</>;
+};
+
+export default LoginReady;
