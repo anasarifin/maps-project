@@ -15,28 +15,38 @@ const klasifikasi = (onu: number, olt: number) => {
     }
 };
 
-const Underspec = ({ underspec, hide }) => {
+const Underspec = ({ underspec, hide, mb, hideUnderspec }) => {
     return (
-        <div className={"map-underspec" + (hide ? " hide" : "")}>
-            <table>
-                <tr>
-                    <th>No. INET</th>
-                    <th>RX OLT</th>
-                    <th>RX ONT</th>
-                    <th>Klasifikasi</th>
-                </tr>
-                {underspec.map((x) => {
-                    return (
-                        <tr>
-                            <td>{x.inet}</td>
-                            <td>{x.olt_rx_pwr}</td>
-                            <td>{x.onu_rx_pwr}</td>
-                            <td>{klasifikasi(parseFloat(x.onu_rx_pwr), parseFloat(x.olt_rx_pwr))}</td>
-                        </tr>
-                    );
-                })}
-            </table>
-        </div>
+        <>
+            {mb ? <div className={"popup-bg" + (hide ? " hide" : "")} /> : <></>}
+            <div className={"map-underspec" + (mb ? " mobile" : "") + (hide ? " hide" : "")}>
+                <table>
+                    <tr>
+                        <th>No. INET</th>
+                        <th>RX OLT</th>
+                        <th>RX ONT</th>
+                        <th>Klasifikasi</th>
+                    </tr>
+                    {underspec.map((x) => {
+                        return (
+                            <tr>
+                                <td>{x.inet}</td>
+                                <td>{x.olt_rx_pwr}</td>
+                                <td>{x.onu_rx_pwr}</td>
+                                <td>{klasifikasi(parseFloat(x.onu_rx_pwr), parseFloat(x.olt_rx_pwr))}</td>
+                            </tr>
+                        );
+                    })}
+                </table>
+                {mb ? (
+                    <div className="close" onClick={hideUnderspec}>
+                        Close
+                    </div>
+                ) : (
+                    <></>
+                )}
+            </div>
+        </>
     );
 };
 

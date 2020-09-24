@@ -18,7 +18,7 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
 
 /* ==================== */
 
-.map-info {
+.map-info-edit {
     position: fixed;
     left: 10px;
     bottom: 10px;
@@ -26,6 +26,18 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
     padding: 20px;
     border-radius: 5px;
     box-shadow: $shadow;
+
+    .odp {
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+    }
+
+    &.mobile {
+        bottom: unset;
+        top: 60px;
+        padding: 10px;
+    }
 }
 
 .map-drawer {
@@ -104,6 +116,12 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
     height: 40px;
     padding: 0 10px;
     font-size: 1.1rem;
+
+    &.mobile {
+        left: 50%;
+        transform: translate(-50%);
+        width: calc(100% - 20px);
+    }
 }
 
 /* ==================== */
@@ -129,6 +147,10 @@ $shadow: 0 0.5px 2px 1px rgba(0, 0, 0, 0.3);
             background-color: whitesmoke;
             color: black;
         }
+    }
+
+    &.mobile {
+        bottom: 160px;
     }
 }
 

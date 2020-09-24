@@ -1,11 +1,11 @@
 import React from "react";
 import { useHistory } from "react-router-dom";
 
-const Profile = ({ data, hide }: Props) => {
+const Profile = ({ data, hide, mb }) => {
     const history = useHistory();
 
     return (
-        <div className={"map-profile" + (hide ? " hide" : "")}>
+        <div className={"map-profile" + (mb ? " mobile" : "") + (hide ? " hide" : "")}>
             <div>{data.name}</div>
             <div className="role">{data.role}</div>
             <div
@@ -15,15 +15,10 @@ const Profile = ({ data, hide }: Props) => {
                 }}
                 className="logout"
             >
-                Logout
+                back to home
             </div>
         </div>
     );
 };
-
-interface Props {
-    data: any;
-    hide?: boolean;
-}
 
 export default Profile;

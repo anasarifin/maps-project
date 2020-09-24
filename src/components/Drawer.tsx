@@ -3,9 +3,9 @@ import { BiRectangle, BiShapePolygon, BiTrash } from "react-icons/bi";
 import { MdSave } from "react-icons/md";
 import { HiOutlineHand } from "react-icons/hi";
 
-const Drawer = ({ mode, hide, hideSave, saveRef }) => {
+const Drawer = ({ mode, hide, hideSave, saveRef, mb }) => {
     return (
-        <div className="map-drawer">
+        <div className={"map-drawer" + (mb ? " mobile" : "") + (hide ? " hide" : "")}>
             <div className={"map-save" + (hideSave ? " hide" : "")}>
                 <input placeholder="Input address..." ref={saveRef} />
                 <MdSave id="savePolygon" />

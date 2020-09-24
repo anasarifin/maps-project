@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { isMobile as mb } from "mobile-device-detect";
 import { useHistory } from "react-router-dom";
 import { useRecoilState, useSetRecoilState } from "recoil";
 import { profile as profileState } from "../recoil";
@@ -16,7 +17,7 @@ const HomeComponent = ({ profile }) => {
     };
 
     return (
-        <div className="home-page">
+        <div className={"home-page" + (mb ? " mobile" : "")}>
             <div className="home-header">
                 <span>{profile.name}</span>
                 <span>|</span>
@@ -27,14 +28,16 @@ const HomeComponent = ({ profile }) => {
             <div className="home-container">
                 <div
                     onClick={() => {
-                        history.push({ pathname: "/view-odp" });
+                        const { uim, valins, underspec } = profile.permission;
+                        if (uim || valins || underspec) history.push({ pathname: "/view-odp" });
                     }}
                 >
                     View ODP
                 </div>
                 <div
                     onClick={() => {
-                        history.push({ pathname: "/polygon-editor" });
+                        const { polygon, editPolygon } = profile.permission;
+                        if (polygon || editPolygon) history.push({ pathname: "/polygon-editor" });
                     }}
                 >
                     Polygon Editor

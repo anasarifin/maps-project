@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { useHistory } from "react-router-dom";
+import { isMobile as mb } from "mobile-device-detect";
 import { useRecoilState } from "recoil";
 import { profile as profileState } from "../recoil";
 import checkUser from "../configs/checkUser";
@@ -13,6 +14,7 @@ import ReactTooltip from "react-tooltip";
 import "../styles/MapsDesktop.scss";
 import Menu from "../components/Menu";
 import Info from "../components/Info";
+import BottomBar from "../components/BottomBar";
 import Button from "../components/Button";
 import Underspec from "../components/Underspec";
 import StreetList from "../components/StreetList";
@@ -90,7 +92,7 @@ const odpFormat = (odpList, source: number) => {
 const MapComponent = ({ profile }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const infoRef = useRef<HTMLDivElement>(null);
-    const streetRef = useRef<HTMLDivElement>(null);
+    const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const radiusRef = useRef<HTMLInputElement>(null);
     const sourceRef = useRef<HTMLInputElement>(null);
@@ -101,11 +103,15 @@ const MapComponent = ({ profile }) => {
     const [streetStatus, setStreetStatus] = useState("");
     const [mode, setMode] = useState("normal");
     const [loading, setLoading] = useState(true);
-    const [showSave, setShowSave] = useState(false);
     const [radius, setRadius] = useState(200);
     const [source, setSource] = useState(1);
+    const [satellite, setSatellite] = useState(false);
     const [underspec, setUnderspec] = useState([]);
-    // const profile = useRecoilValue(profileState);
+    const [hideRadius, setHideRadius] = useState(true);
+    const [hideStreet, setHideStreet] = useState(true);
+    const [hideProfile, setHideProfile] = useState(true);
+    const [hideUnderspec, setHideUnderspec] = useState(true);
+    const [bottomShow, setBottomShow] = useState(false);
 
     // Initialize an variables to call it later
     let googleMap;
@@ -113,9 +119,6 @@ const MapComponent = ({ profile }) => {
     let circle;
     let polygon;
     let autoComplete;
-    let drawingManager;
-    let customPolygon;
-    let polygonSaved = [];
     let odpMarker = [];
     let directionsService;
     let directionsRenderer;
@@ -189,21 +192,6 @@ const MapComponent = ({ profile }) => {
                 clickable: false,
             });
 
-            // Drawing Manager initialize
-            const option = {
-                editable: true,
-                draggable: true,
-                strokeColor: "#FF3300",
-                strokeWeight: 2,
-                fillOpacity: 0.5,
-                fillColor: "#FF3300",
-            };
-            drawingManager = new window.google.maps.drawing.DrawingManager({
-                polygonOptions: option,
-                rectangleOptions: option,
-            });
-            drawingManager.setMap(googleMap);
-
             // Directions initialize
             directionsService = new window.google.maps.DirectionsService();
             directionsRenderer = new window.google.maps.DirectionsRenderer({
@@ -244,16 +232,6 @@ const MapComponent = ({ profile }) => {
             getLocation(location.lat(), location.lng(), radiusRef.current.value, parseInt(sourceRef.current.dataset.source));
         });
 
-        const zoomIn = document.getElementById("zoomIn");
-        window.google.maps.event.addDomListener(zoomIn, "click", () => {
-            googleMap.setZoom(googleMap.getZoom() + 1);
-        });
-
-        const zoomOut = document.getElementById("zoomOut");
-        window.google.maps.event.addDomListener(zoomOut, "click", () => {
-            googleMap.setZoom(googleMap.getZoom() - 1);
-        });
-
         const sourceOption = document.getElementsByClassName("map-source-option")[0];
         window.google.maps.event.addDomListener(sourceOption, "click", (e) => {
             console.log("masuk");
@@ -292,6 +270,44 @@ const MapComponent = ({ profile }) => {
                 }
             }
         });
+
+        const changeView = document.getElementById("changeView");
+        window.google.maps.event.addDomListener(changeView, "click", () => {
+            console.log("satelitte");
+            if (mapRef.current.dataset.satellite != "true") {
+                googleMap.setMapTypeId(window.google.maps.MapTypeId.HYBRID);
+                setSatellite(true);
+            } else {
+                googleMap.setMapTypeId(window.google.maps.MapTypeId.ROADMAP);
+                setSatellite(false);
+            }
+        });
+
+        const find_me = document.getElementById("findMe");
+        window.google.maps.event.addDomListener(find_me, "click", () => {
+            findMe();
+        });
+
+        if (!mb) {
+            const zoomIn = document.getElementById("zoomIn");
+            window.google.maps.event.addDomListener(zoomIn, "click", () => {
+                googleMap.setZoom(googleMap.getZoom() + 1);
+            });
+
+            const zoomOut = document.getElementById("zoomOut");
+            window.google.maps.event.addDomListener(zoomOut, "click", () => {
+                googleMap.setZoom(googleMap.getZoom() - 1);
+            });
+        }
+
+        if (source == 3 && mb) {
+            const element = document.getElementById("underspecButton");
+            console.log(element);
+            element.addEventListener("click", () => {
+                console.log("under bisa");
+                setHideUnderspec(false);
+            });
+        }
     };
 
     const getLocation = (lat: number, lng: number, radius: string, source: number) => {
@@ -330,6 +346,11 @@ const MapComponent = ({ profile }) => {
                 const name = `${streetName}Kel. ${titleCase(data.kelurahan)}, Kec. ${titleCase(data.kecamatan)}, ${
                     regionType ? "Kota" : "Kab."
                 } ${titleCase(kota)}, ${titleCase(data.provinsi).replace("Dki", "DKI")}`;
+
+                if (mb) {
+                    bottomRef.current.style.transition = ".3s";
+                    bottomRef.current.style.bottom = "200px";
+                }
 
                 setLoading(false);
                 setLocationName(name);
@@ -444,6 +465,7 @@ const MapComponent = ({ profile }) => {
                         <span>Device Port: ${data.device_port}</span><br/>
                         <span>Idle Port: ${data.idle_port}</span>
                         <span id="infoDistance"></span>
+                        ${source == 3 && mb ? "<br/><span id='underspecButton'>Underspec Detail</span>" : ""}
                     </div>`;
 
                     odpMarker[i].infoWindow = new window.google.maps.InfoWindow({
@@ -461,7 +483,7 @@ const MapComponent = ({ profile }) => {
                     });
 
                     odpMarker[i].addListener("mouseout", () => {
-                        if (source == 3) {
+                        if (source == 3 && !mb) {
                             setUnderspec([]);
                         }
                         odpMarker[i].infoWindow.close();
@@ -491,13 +513,15 @@ const MapComponent = ({ profile }) => {
                     });
                 });
 
-                const dataDistance = odpMarker
-                    .map((x) => {
-                        return { distance: x.distance, index: x.index, latlng: x.latlng };
-                    })
-                    .sort((a, b) => a.distance - b.distance)
-                    .filter((x, i) => i < 3);
-                getDistance(dataDistance);
+                if (!mb) {
+                    const dataDistance = odpMarker
+                        .map((x) => {
+                            return { distance: x.distance, index: x.index, latlng: x.latlng };
+                        })
+                        .sort((a, b) => a.distance - b.distance)
+                        .filter((x, i) => i < 3);
+                    getDistance(dataDistance);
+                }
             })
             .catch((reject) => {
                 if (!axios.isCancel(reject)) {
@@ -601,57 +625,9 @@ const MapComponent = ({ profile }) => {
         }
     };
 
-    const savePolygon = () => {
-        let path = [];
-        if (customPolygon?.type == "polygon") {
-            const shape = customPolygon.shape.getPath().getArray();
-            path = shape.map((x) => {
-                return new window.google.maps.LatLng(x.lat(), x.lng());
-            });
-            setMode("polygon");
-            drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
-        } else if (customPolygon?.type == "rectangle") {
-            const bounds = customPolygon.shape.getBounds();
-            var NE = bounds.getNorthEast();
-            var SW = bounds.getSouthWest();
-            path = [
-                new window.google.maps.LatLng(SW.lat(), NE.lng()),
-                bounds.getNorthEast(),
-                new window.google.maps.LatLng(NE.lat(), SW.lng()),
-                bounds.getSouthWest(),
-            ];
-            setMode("rectangle");
-            drawingManager?.setDrawingMode(window.google.maps.drawing.OverlayType.RECTANGLE);
-        }
-
-        const polygon = new window.google.maps.Polygon({
-            map: googleMap,
-            paths: path,
-            strokeColor: "#FF3300",
-            strokeWeight: 2,
-            fillOpacity: 0.5,
-            fillColor: "#FF3300",
-            clickable: true,
-        });
-
-        polygon.addListener("mouseover", () => {
-            if (mapRef.current.dataset.mode == "delete") polygon.setOptions({ fillColor: "#00FF00" });
-        });
-        polygon.addListener("mouseout", () => {
-            polygon.setOptions({ fillColor: "#FF3300" });
-        });
-        polygon.addListener("click", () => {
-            if (mapRef.current.dataset.mode == "delete") polygon.setMap(null);
-        });
-
-        customPolygon?.shape.setMap(null);
-        if (customPolygon) polygonSaved.push(polygon);
-        setShowSave(false);
-    };
-
     return (
         <div className="map-page">
-            <div className="map-container" ref={mapRef} data-mode={mode} />
+            <div className="map-container" ref={mapRef} data-mode={mode} data-satellite={satellite} />
 
             <Menu
                 inputRef={inputRef}
@@ -665,50 +641,115 @@ const MapComponent = ({ profile }) => {
                 setSource={(e: number) => {
                     setSource(e);
                 }}
+                mb={mb}
                 sourceRef={sourceRef}
+                hide={hideRadius}
             />
-            <Info
-                infoRef={infoRef}
-                locationName={locationName}
-                status={status}
-                odpStatus={odpStatus}
-                loading={loading}
-                hide={status ? false : true}
+            {!mb ? (
+                <>
+                    <Info
+                        infoRef={infoRef}
+                        locationName={locationName}
+                        status={status}
+                        odpStatus={odpStatus}
+                        loading={loading}
+                        mb={mb}
+                        hide={status ? false : true}
+                    />
+                    <Button
+                        satellite={satellite}
+                        mb={mb}
+                        hide={loading && !status ? true : false}
+                        showStreet={() => {
+                            setHideStreet(false);
+                        }}
+                        toogleProfile={() => {
+                            setHideProfile(!hideProfile);
+                        }}
+                        toogleRadius={() => {
+                            setHideRadius(!hideRadius);
+                        }}
+                        bottomRef={bottomRef}
+                    />
+                </>
+            ) : (
+                <BottomBar
+                    bottomRef={bottomRef}
+                    locationName={locationName}
+                    status={status}
+                    odpStatus={odpStatus}
+                    loading={loading}
+                    bottomShow={bottomShow}
+                    setBottomShow={(e) => {
+                        setBottomShow(e);
+                    }}
+                    satellite={satellite}
+                    mb={mb}
+                    hide={loading && !status ? true : false}
+                    showStreet={() => {
+                        setHideStreet(false);
+                    }}
+                    toogleProfile={() => {
+                        setHideProfile(!hideProfile);
+                    }}
+                    toogleRadius={() => {
+                        setHideRadius(!hideRadius);
+                    }}
+                />
+            )}
+            <Profile data={profile} mb={mb} hide={hideProfile} />
+            <Underspec
+                underspec={underspec}
+                hide={!mb ? !underspec.length : hideUnderspec}
+                mb={mb}
+                hideUnderspec={() => {
+                    setHideUnderspec(true);
+                }}
             />
-            <Button findMe={findMe} />
-            <Profile data={profile} hide={underspec.length ? true : false} />
-            <Underspec underspec={underspec} hide={underspec.length ? false : true} />
             <StreetList
                 streetList={streetList}
                 status={streetStatus}
-                ref={streetRef}
-                hide={mode == "normal" && status && streetStatus ? false : true}
+                mb={mb}
+                hide={!mb ? !streetStatus : hideStreet}
+                hideStreet={() => {
+                    setHideStreet(true);
+                }}
             />
-
-            <ReactTooltip effect="solid" place="left" />
+            {!mb ? <ReactTooltip effect="solid" place="left" /> : <></>}
         </div>
     );
 };
+
+// hide={mode == "normal" && status && streetStatus ? false : true}
 
 const MapReady = () => {
     const [ready, setReady] = useState(false);
     const [profile, setProfile] = useRecoilState(profileState);
     const history = useHistory();
 
+    const checkPermission = (data: Profile) => {
+        const { uim, valins, underspec } = data.permission;
+        if (uim || valins || underspec) {
+            setReady(true);
+        } else {
+            history.replace({ pathname: "/home" });
+        }
+    };
+
     useEffect(() => {
         if (profile.name) {
-            setReady(true);
+            checkPermission(profile);
         } else {
             checkUser()
                 .then((resolve: Profile) => {
                     setProfile(resolve);
-                    setReady(true);
+                    checkPermission(resolve);
                 })
                 .catch(() => {
                     history.replace({ pathname: "/login" });
                 });
         }
-    });
+    }, []);
 
     return <>{ready ? <MapComponent profile={profile} /> : <></>}</>;
 };

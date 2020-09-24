@@ -2,6 +2,19 @@
     width: 100vw;
     height: 100vh;
     background-color: whitesmoke;
+
+    &.mobile {
+        .home-container {
+            grid-template-columns: 1fr;
+            width: 90%;
+            gap: 30px;
+            justify-items: center;
+            div {
+                height: 80px;
+                line-height: 80px;
+            }
+        }
+    }
 }
 .home-header {
     position: fixed;
@@ -24,7 +37,7 @@
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    gap: 30px;
+    gap: 100px;
 
     div {
         background-color: white;
@@ -32,6 +45,15 @@
         height: 200px;
         text-align: center;
         line-height: 200px;
+        border-radius: 5px;
+        border: 1px solid rgba(0, 0, 0, 0.5);
         box-shadow: 0 0 3px 1px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+
+        &:hover {
+            border: 1px solid #f44336;
+            color: #f44336;
+            box-shadow: 0 0 3px 1px #f44336;
+        }
     }
 }

@@ -1,8 +1,8 @@
 import React from "react";
 
-const Info = ({ location, status, polygonStatus, loading }) => {
+const Info = ({ location, status, polygonStatus, loading, mb }) => {
     return (
-        <div className="map-info">
+        <div className={"map-info-edit" + (mb ? " mobile" : "") + (!status ? " hide" : "")}>
             {loading ? (
                 <div className="loading">{status}</div>
             ) : (

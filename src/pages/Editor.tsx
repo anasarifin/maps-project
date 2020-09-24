@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { isMobile as mb } from "mobile-device-detect";
 import { useHistory } from "react-router-dom";
 import { useRecoilState } from "recoil";
 import { profile as profileState } from "../recoil";
@@ -36,8 +37,10 @@ const DrawerComponent = ({ profile }) => {
     const [status, setStatus] = useState("");
     const [polygonStatus, setPolygonStatus] = useState("");
     const [mode, setMode] = useState("hand");
+    const [hideProfile, setHideProfile] = useState(true);
     const [loading, setLoading] = useState(true);
     const [showSave, setShowSave] = useState(false);
+    const [satellite, setSatellite] = useState(false);
 
     // Initialize an variables to call it later
     let googleMap;
@@ -177,16 +180,6 @@ const DrawerComponent = ({ profile }) => {
             savePolygon(saveRef.current.value);
         });
 
-        const zoomIn = document.getElementById("zoomIn");
-        window.google.maps.event.addDomListener(zoomIn, "click", () => {
-            googleMap.setZoom(googleMap.getZoom() + 1);
-        });
-
-        const zoomOut = document.getElementById("zoomOut");
-        window.google.maps.event.addDomListener(zoomOut, "click", () => {
-            googleMap.setZoom(googleMap.getZoom() - 1);
-        });
-
         // const handMode = () => {
         //     setMode("hand");
         //     customPolygon?.shape.setMap(null);
@@ -222,6 +215,34 @@ const DrawerComponent = ({ profile }) => {
         window.google.maps.event.addDomListener(deleteMode, "click", () => {
             drawMode("delete", null);
         });
+
+        const changeView = document.getElementById("changeView");
+        window.google.maps.event.addDomListener(changeView, "click", () => {
+            if (mapRef.current.dataset.satellite != "true") {
+                googleMap.setMapTypeId(window.google.maps.MapTypeId.HYBRID);
+                setSatellite(true);
+            } else {
+                googleMap.setMapTypeId(window.google.maps.MapTypeId.ROADMAP);
+                setSatellite(false);
+            }
+        });
+
+        const find_me = document.getElementById("findMe");
+        window.google.maps.event.addDomListener(find_me, "click", () => {
+            findMe();
+        });
+
+        if (!mb) {
+            const zoomIn = document.getElementById("zoomIn");
+            window.google.maps.event.addDomListener(zoomIn, "click", () => {
+                googleMap.setZoom(googleMap.getZoom() + 1);
+            });
+
+            const zoomOut = document.getElementById("zoomOut");
+            window.google.maps.event.addDomListener(zoomOut, "click", () => {
+                googleMap.setZoom(googleMap.getZoom() - 1);
+            });
+        }
     };
 
     const getLocation = (lat: number, lng: number) => {
@@ -349,13 +370,20 @@ const DrawerComponent = ({ profile }) => {
 
     return (
         <div className="map-page">
-            <div className="map-container" ref={mapRef} data-mode={mode} />
-            <input className="map-search" ref={inputRef} placeholder="Search here..." />
-            <Info location={location} status={status} polygonStatus={polygonStatus} loading={loading} />
-            <Button findMe={findMe} />
-            <Drawer mode={mode} hide={status ? false : true} hideSave={showSave ? false : true} saveRef={saveRef} />
-            <Profile data={profile} />
-            <ReactTooltip effect="solid" place="left" />
+            <div className="map-container" ref={mapRef} data-mode={mode} data-satellite={satellite} />
+            <input className={"map-search" + (mb ? " mobile" : "")} ref={inputRef} placeholder="Search here..." />
+            <Info location={location} status={status} polygonStatus={polygonStatus} loading={loading} mb={mb} />
+            <Button
+                satellite={satellite}
+                mb={mb}
+                editor={true}
+                toogleProfile={() => {
+                    setHideProfile(!hideProfile);
+                }}
+            />
+            <Drawer mode={mode} hide={status && !loading ? false : true} hideSave={showSave ? false : true} saveRef={saveRef} mb={mb} />
+            <Profile data={profile} mb={mb} hide={hideProfile} />
+            {!mb ? <ReactTooltip effect="solid" place="left" /> : <></>}
         </div>
     );
 };
@@ -365,20 +393,29 @@ const DrawerReady = () => {
     const [profile, setProfile] = useRecoilState(profileState);
     const history = useHistory();
 
+    const checkPermission = (data: Profile) => {
+        const { polygon, editPolygon } = data.permission;
+        if (polygon || editPolygon) {
+            setReady(true);
+        } else {
+            history.replace({ pathname: "/" });
+        }
+    };
+
     useEffect(() => {
         if (profile.name) {
-            setReady(true);
+            checkPermission(profile);
         } else {
             checkUser()
                 .then((resolve: Profile) => {
                     setProfile(resolve);
-                    setReady(true);
+                    checkPermission(resolve);
                 })
                 .catch(() => {
                     history.replace({ pathname: "/login" });
                 });
         }
-    });
+    }, []);
 
     return <>{ready ? <DrawerComponent profile={profile} /> : <></>}</>;
 };

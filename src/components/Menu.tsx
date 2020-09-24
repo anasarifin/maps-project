@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
 
-const Menu = ({ role, inputRef, radiusRef, radius, setRadius, source, setSource, sourceRef }) => {
+const Menu = ({ role, inputRef, radiusRef, radius, setRadius, source, setSource, sourceRef, mb, hide }) => {
     return (
-        <div className="map-menu">
+        <div className={"map-menu" + (mb ? " mobile" : "")}>
             <input className="map-search-bar" ref={inputRef} placeholder="Search here..." />
             <div className="map-source-option" data-source={source} ref={sourceRef}>
                 {/* <span className={"option" + (source == 0 ? " active" : "")}>SIIS</span> */}
@@ -31,7 +31,7 @@ const Menu = ({ role, inputRef, radiusRef, radius, setRadius, source, setSource,
                     Underspec
                 </span>
             </div>
-            <div className={"map-radius-slider" + (source == 3 ? " hide" : "")}>
+            <div className={"map-radius-slider" + (mb ? (hide ? " hide" : "") : source == 3 ? " hide" : "")}>
                 <span>Radius: {radius}</span>
                 <input
                     ref={radiusRef}
